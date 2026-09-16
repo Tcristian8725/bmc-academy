@@ -124,9 +124,17 @@ export async function GET(req: NextRequest) {
       certificateUrl,
     });
   } catch (err) {
+    // status 200 mesmo em erro de propósito: esta é uma rota de diagnóstico
+    // chamada via ferramenta externa que não consegue ler o corpo de uma
+    // resposta com status de erro — sem isso, a mensagem real do erro fica
+    // invisível para depuração.
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+      { status: 200 }
     );
   }
 }
