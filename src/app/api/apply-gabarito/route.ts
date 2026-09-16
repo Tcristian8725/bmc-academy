@@ -10,15 +10,19 @@
  *     &key=1D,2B,3A,4C,5D,...           (questão:letra, separado por vírgula)
  *     &images=1:/exam-images/x/q01.jpg,2:/exam-images/x/q02.jpg,...  (opcional — questão:URL/caminho da imagem)
  *     &minScorePercent=80               (opcional — muda a nota mínima de aprovação da prova)
+ *     &videoUrl=https://youtube.com/...  (opcional — cadastra/atualiza o vídeo da entrega técnica)
+ *     &videoTitle=Vídeo ...              (opcional — título da lição de vídeo, tem um padrão)
  *     &publish=true                     (opcional — publica o treinamento no final)
  *
  * Seguro de rodar mais de uma vez (idempotente) — só atualiza qual alternativa
- * está marcada como correta em cada questão informada; nunca apaga nada.
+ * está marcada como correta em cada questão informada; nunca apaga nada, exceto
+ * a lição de vídeo placeholder (texto "link pendente"), que é substituída pela
+ * lição de vídeo real quando videoUrl é informado.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { trainings, exams, questions, answers } from "@/db/schema";
+import { trainings, exams, questions, answers, lessons } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -43,11 +47,13 @@ export async function GET(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");
   const images = req.nextUrl.searchParams.get("images");
   const minScorePercentRaw = req.nextUrl.searchParams.get("minScorePercent");
+  const videoUrl = req.nextUrl.searchParams.get("videoUrl");
+  const videoTitle = req.nextUrl.searchParams.get("videoTitle") || "Vídeo da Entrega Técnica";
   const publish = req.nextUrl.searchParams.get("publish") === "true";
 
-  if (!examCode || (!key && !images && !minScorePercentRaw)) {
+  if (!examCode || (!key && !images && !minScorePercentRaw && !videoUrl)) {
     return NextResponse.json(
-      { ok: false, error: "Parâmetros obrigatórios: examCode e (key e/ou images e/ou minScorePercent)." },
+      { ok: false, error: "Parâmetros obrigatórios: examCode e (key e/ou images e/ou minScorePercent e/ou videoUrl)." },
       { status: 400 }
     );
   }
@@ -145,6 +151,50 @@ export async function GET(req: NextRequest) {
       } else {
         await db.update(exams).set({ minScorePercent }).where(eq(exams.id, exam.id));
         log.push(`Nota mínima de aprovação atualizada para ${minScorePercent}%.`);
+      }
+    }
+
+    if (videoUrl) {
+      const trainingLessons = await db
+        .select()
+        .from(lessons)
+        .where(eq(lessons.trainingId, training.id))
+        .orderBy(lessons.order);
+
+      const existingVideoLesson = trainingLessons.find((l) => l.type === "VIDEO");
+      // lição placeholder criada por import-real-exams.ts, com o link do vídeo
+      // ainda pendente — identificada pelo título fixo usado lá.
+      const placeholderLesson = trainingLessons.find(
+        (l) => l.type === "TEXT" && l.title === "Vídeo de Entrega Técnica (link pendente)"
+      );
+
+      if (existingVideoLesson) {
+        await db
+          .update(lessons)
+          .set({ url: videoUrl, title: videoTitle })
+          .where(eq(lessons.id, existingVideoLesson.id));
+        log.push(`Lição de vídeo existente atualizada com o novo link (${videoUrl}).`);
+      } else if (placeholderLesson) {
+        await db.delete(lessons).where(eq(lessons.id, placeholderLesson.id));
+        await db.insert(lessons).values({
+          trainingId: training.id,
+          title: videoTitle,
+          order: placeholderLesson.order,
+          type: "VIDEO",
+          url: videoUrl,
+        });
+        log.push(`Lição placeholder substituída por lição de vídeo (${videoUrl}).`);
+      } else {
+        const nextOrder =
+          trainingLessons.length > 0 ? Math.max(...trainingLessons.map((l) => l.order)) + 1 : 1;
+        await db.insert(lessons).values({
+          trainingId: training.id,
+          title: videoTitle,
+          order: nextOrder,
+          type: "VIDEO",
+          url: videoUrl,
+        });
+        log.push(`Lição de vídeo criada (${videoUrl}).`);
       }
     }
 
