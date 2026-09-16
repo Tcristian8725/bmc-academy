@@ -42,6 +42,10 @@ export async function GET(req: NextRequest) {
 
   const examCode = req.nextUrl.searchParams.get("examCode");
   const email = req.nextUrl.searchParams.get("email")?.trim().toLowerCase();
+  // Reemite o PDF do certificado do zero mesmo se já existir um (útil depois
+  // de uma mudança de layout do certificado, para gerar de novo com o
+  // template novo) — nunca cria um segundo certificado, sempre substitui.
+  const forceReissue = req.nextUrl.searchParams.get("forceReissue") === "true";
 
   if (!examCode || !email) {
     return NextResponse.json(
@@ -108,13 +112,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const [existingCertificate] = await db
+    const [existingCertificateRow] = await db
       .select()
       .from(certificates)
       .where(and(eq(certificates.userId, user.id), eq(certificates.trainingId, training.id)));
+    let existingCertificate: typeof existingCertificateRow | undefined = existingCertificateRow;
 
     let certificateUrl = existingCertificate?.pdfPath;
     let issuedNow = false;
+
+    if (passedNow && existingCertificate && forceReissue) {
+      await db.delete(certificates).where(eq(certificates.id, existingCertificate.id));
+      existingCertificate = undefined;
+    }
 
     if (passedNow && !existingCertificate) {
       certificateUrl = await issueCertificateForTraining(user.id, training.id, scorePercent);
