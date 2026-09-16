@@ -128,10 +128,26 @@ export async function GET(req: NextRequest) {
     // chamada via ferramenta externa que não consegue ler o corpo de uma
     // resposta com status de erro — sem isso, a mensagem real do erro fica
     // invisível para depuração.
+    // Percorre a cadeia de "cause" (drizzle envolve o erro real do driver pg
+    // em "Failed query: ..." e guarda o erro original em err.cause).
+    const causes: string[] = [];
+    let cur: unknown = err;
+    let depth = 0;
+    while (cur && depth < 5) {
+      if (cur instanceof Error) {
+        causes.push(cur.message);
+        cur = (cur as { cause?: unknown }).cause;
+      } else {
+        causes.push(String(cur));
+        cur = undefined;
+      }
+      depth++;
+    }
     return NextResponse.json(
       {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
+        causes,
         stack: err instanceof Error ? err.stack : undefined,
       },
       { status: 200 }
