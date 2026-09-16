@@ -7,8 +7,9 @@
  * nota mínima de aprovação foi alterada depois da tentativa.
  *
  * Reavalia SEMPRE contra a nota mínima ATUAL da prova (não a de quando a
- * pessoa fez a prova) e, se passou e ainda não existe certificado, emite um
- * agora (sem duplicar se já existir).
+ * pessoa fez a prova), usando a MELHOR tentativa entre todas as registradas
+ * (não necessariamente a mais recente) — e, se essa melhor tentativa passou
+ * e ainda não existe certificado, emite um agora (sem duplicar se já existir).
  *
  * Uso:
  *   https://SEU-APP.vercel.app/api/exam-result
@@ -87,15 +88,24 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const scorePercent = lastAttempt.scorePercent ?? 0;
+    // Para decidir aprovação/certificado, usa a MELHOR tentativa (maior nota),
+    // não necessariamente a mais recente: uma vez aprovado numa tentativa
+    // dentro do limite permitido, uma tentativa seguinte com nota pior não
+    // "desfaz" a aprovação — é o comportamento padrão de LMS, e evita perder
+    // uma aprovação real por causa de uma tentativa extra de teste depois.
+    const bestAttempt = allAttempts.reduce((best, a) =>
+      (a.scorePercent ?? 0) > (best.scorePercent ?? 0) ? a : best
+    , lastAttempt);
+
+    const scorePercent = bestAttempt.scorePercent ?? 0;
     const passedNow = scorePercent >= exam.minScorePercent;
 
-    // mantém o histórico da tentativa coerente com a regra atual
-    if (lastAttempt.passed !== passedNow) {
-      await db
-        .update(examAttempts)
-        .set({ passed: passedNow })
-        .where(eq(examAttempts.id, lastAttempt.id));
+    // mantém o histórico de cada tentativa coerente com a regra atual de nota mínima
+    for (const a of allAttempts) {
+      const shouldBePassed = (a.scorePercent ?? 0) >= exam.minScorePercent;
+      if (a.passed !== shouldBePassed) {
+        await db.update(examAttempts).set({ passed: shouldBePassed }).where(eq(examAttempts.id, a.id));
+      }
     }
 
     const [existingCertificate] = await db
@@ -117,6 +127,7 @@ export async function GET(req: NextRequest) {
       user: { name: user.name, email: user.email },
       training: { code: training.code, title: training.title },
       attemptNumber: lastAttempt.attemptNumber,
+      bestAttemptNumber: bestAttempt.attemptNumber,
       allAttempts: allAttempts.map((a) => ({
         attemptNumber: a.attemptNumber,
         scorePercent: a.scorePercent,
