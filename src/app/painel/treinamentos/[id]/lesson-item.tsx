@@ -1,8 +1,8 @@
 "use client";
 
 import { useTransition } from "react";
-import { toEmbedUrl } from "@/lib/video";
 import { markLessonViewedAction } from "./actions";
+import { toEmbedUrl } from "@/lib/video";
 
 type Lesson = {
   id: string;

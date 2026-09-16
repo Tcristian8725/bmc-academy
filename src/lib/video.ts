@@ -36,6 +36,7 @@ export function toEmbedUrl(url: string): string {
       const id = parsed.pathname.split("/")[2];
       return id ? `https://www.youtube.com/embed/${id}` : url;
     }
+    // já é /embed/... (ou outra rota do youtube) — mantém como está
     return url;
   }
 

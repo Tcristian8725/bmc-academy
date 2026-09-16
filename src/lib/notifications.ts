@@ -4,14 +4,14 @@ import { notificationLogs } from "@/db/schema";
 /**
  * Serviço de notificação por e-mail — seção 13 do Prompt Mestre.
  *
- * Nenhum provedor definitivo foi escolhido ainda (aguardando decisão do Telles/BMC).
- * Por padrão, este serviço apenas REGISTRA a notificação (transporte "console/log"),
- * sem enviar de verdade — assim dá pra ver o conteúdo do e-mail e o histórico sem
- * depender de nenhuma conta paga.
+ * Provedor definitivo ainda não decidido para o restante das notificações
+ * (aguardando decisão do Telles/BMC) — por padrão, este serviço apenas
+ * REGISTRA a notificação (transporte "console/log"), sem enviar de verdade.
  *
- * Para ligar o envio real no futuro, basta implementar `sendViaProvider` usando
- * Resend, SendGrid, Amazon SES (todos têm camada gratuita) e trocar a chamada
- * abaixo — o restante do sistema (NotificationLog, gatilhos) não muda.
+ * Envio real via Resend (https://resend.com) já está ligado quando a variável
+ * de ambiente RESEND_API_KEY está configurada — usado hoje pelo e-mail de
+ * acesso do autocadastro (/solicitar-acesso). Sem a variável configurada,
+ * cai automaticamente no modo simulado (SIMULADO), sem quebrar nada.
  */
 
 interface NotificationInput {
@@ -22,23 +22,68 @@ interface NotificationInput {
   relatedUserId?: string;
 }
 
-export async function sendNotification(input: NotificationInput) {
-  // TODO (fase 10 — E-mail): plugar provedor real aqui quando definido.
-  const simulated = true;
+async function sendViaResend(toEmail: string, subject: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, error: "RESEND_API_KEY não configurada" };
 
-  console.log(`\n[e-mail simulado] Para: ${input.toEmail}`);
-  console.log(`Assunto: ${input.subject}`);
-  console.log(input.body);
-  console.log("---");
+  const from = process.env.RESEND_FROM_EMAIL || "BMC Academy <onboarding@resend.dev>";
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [toEmail],
+        subject,
+        text: body,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText);
+      return { ok: false, error: `Resend ${res.status}: ${errText}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function sendNotification(input: NotificationInput) {
+  const hasProvider = Boolean(process.env.RESEND_API_KEY);
+
+  let status: "ENVIADO" | "FALHOU" | "SIMULADO" = "SIMULADO";
+  let error: string | undefined;
+
+  if (hasProvider) {
+    const result = await sendViaResend(input.toEmail, input.subject, input.body);
+    status = result.ok ? "ENVIADO" : "FALHOU";
+    error = result.error;
+  }
+
+  if (!hasProvider || status === "FALHOU") {
+    console.log(`\n[e-mail ${status.toLowerCase()}] Para: ${input.toEmail}`);
+    console.log(`Assunto: ${input.subject}`);
+    console.log(input.body);
+    if (error) console.log(`Erro: ${error}`);
+    console.log("---");
+  }
 
   await db.insert(notificationLogs).values({
     toEmail: input.toEmail,
     subject: input.subject,
     body: input.body,
-    status: simulated ? "SIMULADO" : "ENVIADO",
+    status,
+    error,
     relatedTrainingId: input.relatedTrainingId,
     relatedUserId: input.relatedUserId,
   });
+
+  return { ok: status !== "FALHOU" };
 }
 
 export function certificateApprovedUserEmail(params: {

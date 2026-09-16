@@ -39,6 +39,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   session.name = user.name;
   session.email = user.email;
   session.role = user.role as UserRole;
+  session.profileCompleted = user.profileCompleted;
   await session.save();
 
   await db
@@ -67,8 +68,25 @@ export async function requireUser(allowedRoles?: UserRole[]) {
   if (!session.userId) {
     redirect("/login");
   }
+  // Conta criada pelo autocadastro público (/solicitar-acesso) precisa
+  // completar nome/CPF/CNPJ/endereço/tipo antes de acessar qualquer outra
+  // página protegida.
+  if (session.profileCompleted === false) {
+    redirect("/cadastro");
+  }
   if (allowedRoles && !allowedRoles.includes(session.role as UserRole)) {
     redirect("/painel");
+  }
+  return session as Required<Pick<typeof session, "userId" | "name" | "email" | "role">> &
+    typeof session;
+}
+
+/** Usa na própria página /cadastro: exige login, mas NÃO redireciona por
+ *  perfil incompleto (senão criaria um loop de redirecionamento). */
+export async function requireLoggedIn() {
+  const session = await getSession();
+  if (!session.userId) {
+    redirect("/login");
   }
   return session as Required<Pick<typeof session, "userId" | "name" | "email" | "role">> &
     typeof session;

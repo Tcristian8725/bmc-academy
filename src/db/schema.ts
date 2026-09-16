@@ -57,6 +57,15 @@ export const users = pgTable("users", {
   department: text("department"),
   branchId: text("branch_id").references(() => branches.id),
   managerId: text("manager_id"), // auto-referência ao gestor (FK aplicada via relations)
+  cpf: text("cpf"), // CPF — só a partir do autocadastro (seção 3 do Prompt Mestre)
+  // CNPJ pode se repetir entre vários usuários (várias pessoas da mesma empresa
+  // terceirizada podem ser técnicas/RCs) — de propósito, sem restrição de único.
+  cnpj: text("cnpj"),
+  address: text("address"), // endereço completo — texto livre por enquanto
+  // false só para contas criadas pelo autocadastro público (/solicitar-acesso),
+  // até a pessoa completar nome/CPF/CNPJ/endereço/tipo no primeiro acesso.
+  // Contas criadas pelo admin já nascem com o perfil completo (default true).
+  profileCompleted: boolean("profile_completed").notNull().default(true),
   active: boolean("active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at", { mode: "string", withTimezone: true }),
   ...timestamps(),

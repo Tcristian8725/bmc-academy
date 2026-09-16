@@ -1,7 +1,7 @@
 import Link from "next/link";
-import LoginForm from "./login-form";
+import RequestAccessForm from "./request-form";
 
-export default function LoginPage() {
+export default function SolicitarAcessoPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-light px-4">
       <div className="w-full max-w-sm">
@@ -11,19 +11,20 @@ export default function LoginPage() {
               BMC <span className="mx-1 font-light">|</span> HYUNDAI
             </span>
           </div>
-          <h1 className="text-lg font-semibold text-foreground">BMC Academy</h1>
+          <h1 className="text-lg font-semibold text-foreground">Solicitar acesso</h1>
           <p className="text-sm text-gray-500">
-            Plataforma de Treinamento Técnico e Comercial
+            Informe seu e-mail para receber seu login e senha por e-mail.
           </p>
         </div>
-        <LoginForm />
-        <p className="mt-4 text-center text-sm">
-          <Link href="/solicitar-acesso" className="font-medium text-brand hover:underline">
-            Ainda não tenho conta
+
+        <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+          <RequestAccessForm />
+        </div>
+
+        <p className="mt-6 text-center text-sm">
+          <Link href="/login" className="font-medium text-brand hover:underline">
+            Já tenho conta — fazer login
           </Link>
-        </p>
-        <p className="mt-6 text-center text-xs text-gray-400">
-          Protótipo interno de validação — dados de teste.
         </p>
       </div>
     </div>

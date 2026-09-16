@@ -8,6 +8,9 @@ export interface SessionData {
   name?: string;
   email?: string;
   role?: UserRole;
+  // false só enquanto uma conta criada pelo autocadastro público
+  // (/solicitar-acesso) ainda não completou nome/CPF/CNPJ/endereço/tipo.
+  profileCompleted?: boolean;
 }
 
 const secret = process.env.SESSION_SECRET;

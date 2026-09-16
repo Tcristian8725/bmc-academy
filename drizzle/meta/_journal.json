@@ -8,6 +8,13 @@
       "when": 1789502679364,
       "tag": "0000_init_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789577626607,
+      "tag": "0001_add_user_signup_fields",
+      "breakpoints": true
     }
   ]
 }
