@@ -71,12 +71,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const [lastAttempt] = await db
+    const allAttempts = await db
       .select()
       .from(examAttempts)
       .where(and(eq(examAttempts.examId, exam.id), eq(examAttempts.userId, user.id)))
-      .orderBy(desc(examAttempts.attemptNumber))
-      .limit(1);
+      .orderBy(desc(examAttempts.attemptNumber));
+
+    const [lastAttempt] = allAttempts;
 
     if (!lastAttempt) {
       return NextResponse.json({
@@ -116,6 +117,12 @@ export async function GET(req: NextRequest) {
       user: { name: user.name, email: user.email },
       training: { code: training.code, title: training.title },
       attemptNumber: lastAttempt.attemptNumber,
+      allAttempts: allAttempts.map((a) => ({
+        attemptNumber: a.attemptNumber,
+        scorePercent: a.scorePercent,
+        passed: a.passed,
+        submittedAt: a.submittedAt,
+      })),
       scorePercent,
       minScorePercent: exam.minScorePercent,
       passed: passedNow,
