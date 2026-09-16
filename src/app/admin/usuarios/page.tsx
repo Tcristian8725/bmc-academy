@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import UserForm from "./user-form";
-import { toggleUserActiveAction } from "./actions";
+import { toggleUserActiveAction, updateUserRoleAction } from "./actions";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
@@ -11,8 +11,15 @@ const roleLabel: Record<string, string> = {
   RC: "RC",
 };
 
+const ROLE_OPTIONS = [
+  ["TECNICO", "Técnico"],
+  ["RC", "RC / Representante Comercial"],
+  ["GESTOR", "Gestor"],
+  ["ADMIN", "Administrador"],
+] as const;
+
 export default async function UsuariosPage() {
-  await requireUser(["ADMIN"]);
+  const session = await requireUser(["ADMIN"]);
 
   const allUsers = await db.select().from(users);
   const managers = allUsers.filter((u) => u.role === "GESTOR" || u.role === "ADMIN");
@@ -45,7 +52,34 @@ export default async function UsuariosPage() {
               <tr key={u.id}>
                 <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                <td className="px-4 py-3 text-gray-600">{roleLabel[u.role] ?? u.role}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  {u.id === session.userId ? (
+                    roleLabel[u.role] ?? u.role
+                  ) : (
+                    <form
+                      action={updateUserRoleAction.bind(null, u.id)}
+                      className="flex items-center gap-2"
+                    >
+                      <select
+                        name="role"
+                        defaultValue={u.role}
+                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                      >
+                        {ROLE_OPTIONS.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="text-xs font-medium text-brand hover:underline"
+                      >
+                        Salvar
+                      </button>
+                    </form>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${

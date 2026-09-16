@@ -51,6 +51,22 @@ export async function createUserAction(
   return { success: true };
 }
 
+export async function updateUserRoleAction(userId: string, formData: FormData) {
+  const session = await requireUser(["ADMIN"]);
+
+  if (userId === session.userId) {
+    // Evita que o admin logado tire o próprio acesso de administrador por engano.
+    return;
+  }
+
+  const role = String(formData.get("role") || "") as "ADMIN" | "GESTOR" | "TECNICO" | "RC";
+  if (!["ADMIN", "GESTOR", "TECNICO", "RC"].includes(role)) return;
+
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+  await logAudit(session.userId!, "USER_ROLE_CHANGED", { userId, role });
+  revalidatePath("/admin/usuarios");
+}
+
 export async function toggleUserActiveAction(userId: string, active: boolean) {
   const session = await requireUser(["ADMIN"]);
   await db.update(users).set({ active }).where(eq(users.id, userId));
