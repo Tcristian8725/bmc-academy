@@ -61,3 +61,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, log }, { status: 500 });
   }
 }
+// redeploy trigger 2026-09-16T21:03:58Z - novo SETUP_TOKEN
