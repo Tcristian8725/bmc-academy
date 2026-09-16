@@ -116,6 +116,28 @@ export async function addQuestionAction(
   revalidatePath(`/admin/treinamentos/${trainingId}`);
 }
 
+export async function setCorrectAnswersAction(
+  trainingId: string,
+  questionId: string,
+  formData: FormData
+) {
+  const session = await assertAdmin();
+
+  const correctIds = new Set(formData.getAll("correctAnswerId") as string[]);
+
+  const existingAnswers = await db.select().from(answers).where(eq(answers.questionId, questionId));
+
+  for (const a of existingAnswers) {
+    const shouldBeCorrect = correctIds.has(a.id);
+    if (a.correct !== shouldBeCorrect) {
+      await db.update(answers).set({ correct: shouldBeCorrect }).where(eq(answers.id, a.id));
+    }
+  }
+
+  await logAudit(session.userId!, "QUESTION_ANSWER_KEY_UPDATED", { trainingId, questionId });
+  revalidatePath(`/admin/treinamentos/${trainingId}`);
+}
+
 export async function deleteQuestionAction(trainingId: string, questionId: string) {
   await assertAdmin();
   await db.delete(answers).where(eq(answers.questionId, questionId));

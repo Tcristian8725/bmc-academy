@@ -17,6 +17,7 @@ import {
   deleteLessonAction,
   createExamAction,
   addQuestionAction,
+  setCorrectAnswersAction,
   deleteQuestionAction,
   assignUserAction,
   unassignUserAction,
@@ -218,32 +219,63 @@ export default async function TrainingDetailPage({
               {exam.title} — nota mínima {exam.minScorePercent}%, {exam.maxAttempts} tentativas
             </p>
 
-            {examQuestions.map((q, idx) => (
-              <div
-                key={q.id}
-                className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-black/5"
-              >
-                <div className="flex items-start justify-between">
-                  <p className="text-sm font-medium text-foreground">
-                    {idx + 1}. {q.statement}{" "}
-                    <span className="text-xs text-gray-400">({q.type})</span>
-                  </p>
-                  <form action={deleteQuestionAction.bind(null, id, q.id)}>
-                    <button type="submit" className="text-xs text-red-600 hover:underline">
-                      Remover
+            {examQuestions.map((q, idx) => {
+              const qAnswers = questionAnswers.get(q.id) ?? [];
+              const hasGabarito = qAnswers.some((a) => a.correct);
+              return (
+                <div
+                  key={q.id}
+                  className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-black/5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium text-foreground">
+                      {idx + 1}. {q.statement}{" "}
+                      <span className="text-xs text-gray-400">({q.type})</span>
+                    </p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span
+                        className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                          hasGabarito
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {hasGabarito ? "Gabarito definido" : "Gabarito pendente"}
+                      </span>
+                      <form action={deleteQuestionAction.bind(null, id, q.id)}>
+                        <button type="submit" className="text-xs text-red-600 hover:underline">
+                          Remover
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  <form
+                    action={setCorrectAnswersAction.bind(null, id, q.id)}
+                    className="mt-2 space-y-1.5"
+                  >
+                    {qAnswers.map((a) => (
+                      <label key={a.id} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          name="correctAnswerId"
+                          value={a.id}
+                          defaultChecked={a.correct}
+                          className="accent-[--color-brand]"
+                        />
+                        {a.text}
+                      </label>
+                    ))}
+                    <button
+                      type="submit"
+                      className="mt-1 rounded-lg bg-brand px-3 py-1 text-xs font-semibold text-white hover:bg-brand-dark"
+                    >
+                      Salvar gabarito
                     </button>
                   </form>
                 </div>
-                <ul className="mt-1 text-xs text-gray-500">
-                  {(questionAnswers.get(q.id) ?? []).map((a) => (
-                    <li key={a.id}>
-                      {a.correct ? "✓ " : "— "}
-                      {a.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              );
+            })}
 
             <details className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
               <summary className="cursor-pointer text-sm font-semibold text-brand">

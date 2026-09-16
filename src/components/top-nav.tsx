@@ -43,6 +43,12 @@ export default function TopNav({
             <p className="text-sm font-medium text-foreground">{name}</p>
             <p className="text-xs text-gray-500">{roleLabel[role] ?? role}</p>
           </div>
+          <Link
+            href="/senha"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Trocar senha
+          </Link>
           <form action={logoutAction}>
             <button
               type="submit"
