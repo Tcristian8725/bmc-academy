@@ -12,17 +12,22 @@
  *     &minScorePercent=80               (opcional — muda a nota mínima de aprovação da prova)
  *     &videoUrl=https://youtube.com/...  (opcional — cadastra/atualiza o vídeo da entrega técnica)
  *     &videoTitle=Vídeo ...              (opcional — título da lição de vídeo, tem um padrão)
- *     &publish=true                     (opcional — publica o treinamento no final)
+ *     &publish=true                     (opcional — publica o treinamento e atribui a TECNICO/RC)
  *
  * Seguro de rodar mais de uma vez (idempotente) — só atualiza qual alternativa
  * está marcada como correta em cada questão informada; nunca apaga nada, exceto
  * a lição de vídeo placeholder (texto "link pendente"), que é substituída pela
  * lição de vídeo real quando videoUrl é informado.
+ *
+ * `publish=true` também atribui o treinamento (obrigatório) a todos os
+ * usuários TECNICO/RC já cadastrados, para ficar de fato disponível pra
+ * quem precisa fazer a prova — publicar sozinho não deixava visível em
+ * "Meus treinamentos" sem uma atribuição manual pelo admin.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { trainings, exams, questions, answers, lessons } from "@/db/schema";
+import { trainings, exams, questions, answers, lessons, trainingAssignments, users } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -204,6 +209,36 @@ export async function GET(req: NextRequest) {
         .set({ published: true, publishedAt: new Date().toISOString() })
         .where(eq(trainings.id, training.id));
       log.push("Treinamento publicado.");
+
+      // Atribui o treinamento (obrigatório) a todos os TECNICO/RC já
+      // cadastrados — publicar sozinho não deixa o treinamento visível em
+      // "Meus treinamentos" de ninguém sem uma atribuição.
+      const targetUsers = await db
+        .select()
+        .from(users)
+        .where(inArray(users.role, ["TECNICO", "RC"]));
+
+      const existingAssignments = await db
+        .select()
+        .from(trainingAssignments)
+        .where(eq(trainingAssignments.trainingId, training.id));
+      const alreadyAssignedUserIds = new Set(existingAssignments.map((a) => a.userId));
+
+      let assignedCount = 0;
+      for (const u of targetUsers) {
+        if (alreadyAssignedUserIds.has(u.id)) continue;
+        await db.insert(trainingAssignments).values({
+          trainingId: training.id,
+          userId: u.id,
+          required: true,
+        });
+        assignedCount++;
+      }
+      if (assignedCount > 0) {
+        log.push(`Treinamento atribuído (obrigatório) a ${assignedCount} usuário(s) TECNICO/RC.`);
+      } else {
+        log.push("Todos os usuários TECNICO/RC já tinham esse treinamento atribuído.");
+      }
     }
 
     return NextResponse.json({ ok: true, log });
