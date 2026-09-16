@@ -1,7 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import QRCode from "qrcode";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 // Cor institucional aproximada (extraída da logo oficial — hex exato ainda A CONFIRMAR)
 const BRAND = rgb(0 / 255, 47 / 255, 135 / 255);
@@ -130,12 +128,16 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   return Buffer.from(pdfBytes);
 }
 
-export async function saveCertificatePdf(code: string, bytes: Buffer): Promise<string> {
-  const dir = path.join(process.cwd(), "public", "certificates");
-  await fs.mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `${code}.pdf`);
-  await fs.writeFile(filePath, bytes);
-  return `/certificates/${code}.pdf`; // caminho público servido pelo Next.js
+/**
+ * Guarda o PDF do certificado no BANCO (base64), não no disco — funções
+ * serverless da Vercel rodam com sistema de arquivos somente leitura, então
+ * gravar em `public/certificates` (como uma versão anterior fazia) quebrava
+ * a emissão do certificado em produção com um erro. O caminho retornado é
+ * uma URL que a rota `/certificados/arquivo/[code]` serve dinamicamente,
+ * lendo o PDF de volta do banco.
+ */
+export function certificatePdfUrl(code: string): string {
+  return `/certificados/arquivo/${code}.pdf`;
 }
 
 export function generateCertificateCode(): string {

@@ -16,7 +16,7 @@ import { logAudit } from "./audit";
 import {
   generateCertificateCode,
   generateCertificatePdf,
-  saveCertificatePdf,
+  certificatePdfUrl,
 } from "./certificate";
 import {
   sendNotification,
@@ -262,7 +262,7 @@ export async function submitExamAttempt(
 // Certificado + comunicação (seções 11 e 12 do Prompt Mestre)
 // ---------------------------------------------------------------------------
 
-async function issueCertificateForTraining(
+export async function issueCertificateForTraining(
   userId: string,
   trainingId: string,
   scorePercent: number
@@ -296,7 +296,7 @@ async function issueCertificateForTraining(
     issuedAtLabel: completedAtLabel,
     validationUrl,
   });
-  const pdfPath = await saveCertificatePdf(code, pdfBytes);
+  const pdfPath = certificatePdfUrl(code);
 
   await db.insert(certificates).values({
     userId,
@@ -305,6 +305,7 @@ async function issueCertificateForTraining(
     workloadHours: training.workloadHours,
     scorePercent,
     pdfPath,
+    pdfData: pdfBytes.toString("base64"),
   });
 
   await logAudit(userId, "CERTIFICATE_ISSUED", { trainingId, code, scorePercent });

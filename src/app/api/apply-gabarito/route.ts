@@ -9,6 +9,7 @@
  *     &examCode=ENTREGA-HB640C          (código do treinamento, ver trainings.code)
  *     &key=1D,2B,3A,4C,5D,...           (questão:letra, separado por vírgula)
  *     &images=1:/exam-images/x/q01.jpg,2:/exam-images/x/q02.jpg,...  (opcional — questão:URL/caminho da imagem)
+ *     &minScorePercent=80               (opcional — muda a nota mínima de aprovação da prova)
  *     &publish=true                     (opcional — publica o treinamento no final)
  *
  * Seguro de rodar mais de uma vez (idempotente) — só atualiza qual alternativa
@@ -41,11 +42,12 @@ export async function GET(req: NextRequest) {
   const examCode = req.nextUrl.searchParams.get("examCode");
   const key = req.nextUrl.searchParams.get("key");
   const images = req.nextUrl.searchParams.get("images");
+  const minScorePercentRaw = req.nextUrl.searchParams.get("minScorePercent");
   const publish = req.nextUrl.searchParams.get("publish") === "true";
 
-  if (!examCode || (!key && !images)) {
+  if (!examCode || (!key && !images && !minScorePercentRaw)) {
     return NextResponse.json(
-      { ok: false, error: "Parâmetros obrigatórios: examCode e (key e/ou images)." },
+      { ok: false, error: "Parâmetros obrigatórios: examCode e (key e/ou images e/ou minScorePercent)." },
       { status: 400 }
     );
   }
@@ -133,6 +135,16 @@ export async function GET(req: NextRequest) {
         }
         await db.update(questions).set({ imageUrl: url }).where(eq(questions.id, question.id));
         log.push(`Questão ${qNum}: imagem definida (${url}).`);
+      }
+    }
+
+    if (minScorePercentRaw) {
+      const minScorePercent = Number(minScorePercentRaw);
+      if (!Number.isFinite(minScorePercent) || minScorePercent < 0 || minScorePercent > 100) {
+        log.push(`minScorePercent inválido: "${minScorePercentRaw}" — ignorado.`);
+      } else {
+        await db.update(exams).set({ minScorePercent }).where(eq(exams.id, exam.id));
+        log.push(`Nota mínima de aprovação atualizada para ${minScorePercent}%.`);
       }
     }
 

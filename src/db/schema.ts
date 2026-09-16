@@ -245,6 +245,11 @@ export const certificates = pgTable("certificates", {
     .notNull(),
   expiresAt: timestamp("expires_at", { mode: "string", withTimezone: true }), // vencimento/recertificação
   pdfPath: text("pdf_path"),
+  // PDF em base64, guardado no banco em vez do disco: funções serverless da
+  // Vercel têm sistema de arquivos somente leitura (exceto /tmp, que não é
+  // persistente entre chamadas) — gravar em disco quebrava a emissão do
+  // certificado em produção. Servido de volta em /certificados/arquivo/[code].
+  pdfData: text("pdf_data"),
 });
 
 // --- Notificações -------------------------------------------------------
