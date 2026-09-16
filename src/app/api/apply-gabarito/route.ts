@@ -8,6 +8,7 @@
  *     ?token=SEU_TOKEN
  *     &examCode=ENTREGA-HB640C          (código do treinamento, ver trainings.code)
  *     &key=1D,2B,3A,4C,5D,...           (questão:letra, separado por vírgula)
+ *     &images=1:/exam-images/x/q01.jpg,2:/exam-images/x/q02.jpg,...  (opcional — questão:URL/caminho da imagem)
  *     &publish=true                     (opcional — publica o treinamento no final)
  *
  * Seguro de rodar mais de uma vez (idempotente) — só atualiza qual alternativa
@@ -39,11 +40,12 @@ export async function GET(req: NextRequest) {
 
   const examCode = req.nextUrl.searchParams.get("examCode");
   const key = req.nextUrl.searchParams.get("key");
+  const images = req.nextUrl.searchParams.get("images");
   const publish = req.nextUrl.searchParams.get("publish") === "true";
 
-  if (!examCode || !key) {
+  if (!examCode || (!key && !images)) {
     return NextResponse.json(
-      { ok: false, error: "Parâmetros obrigatórios: examCode e key." },
+      { ok: false, error: "Parâmetros obrigatórios: examCode e (key e/ou images)." },
       { status: 400 }
     );
   }
@@ -72,40 +74,66 @@ export async function GET(req: NextRequest) {
       .where(eq(questions.examId, exam.id))
       .orderBy(questions.order);
 
-    const pairs = key
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    if (key) {
+      const pairs = key
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-    for (const pair of pairs) {
-      const m = pair.match(/^(\d+)\s*[-:]?\s*([A-Da-d])$/);
-      if (!m) {
-        log.push(`Ignorado (formato inválido): "${pair}"`);
-        continue;
-      }
-      const qNum = Number(m[1]);
-      const letter = m[2].toUpperCase();
-      const question = examQuestions.find((q) => q.order === qNum);
-      if (!question) {
-        log.push(`Questão ${qNum} não encontrada — pulando.`);
-        continue;
-      }
-
-      const qAnswers = await db.select().from(answers).where(eq(answers.questionId, question.id));
-      const targetOrder = LETTER_TO_ORDER[letter];
-      const target = qAnswers.find((a) => a.order === targetOrder);
-      if (!target) {
-        log.push(`Alternativa ${letter} da questão ${qNum} não encontrada — pulando.`);
-        continue;
-      }
-
-      for (const a of qAnswers) {
-        const shouldBeCorrect = a.id === target.id;
-        if (a.correct !== shouldBeCorrect) {
-          await db.update(answers).set({ correct: shouldBeCorrect }).where(eq(answers.id, a.id));
+      for (const pair of pairs) {
+        const m = pair.match(/^(\d+)\s*[-:]?\s*([A-Da-d])$/);
+        if (!m) {
+          log.push(`Ignorado (formato inválido): "${pair}"`);
+          continue;
         }
+        const qNum = Number(m[1]);
+        const letter = m[2].toUpperCase();
+        const question = examQuestions.find((q) => q.order === qNum);
+        if (!question) {
+          log.push(`Questão ${qNum} não encontrada — pulando.`);
+          continue;
+        }
+
+        const qAnswers = await db.select().from(answers).where(eq(answers.questionId, question.id));
+        const targetOrder = LETTER_TO_ORDER[letter];
+        const target = qAnswers.find((a) => a.order === targetOrder);
+        if (!target) {
+          log.push(`Alternativa ${letter} da questão ${qNum} não encontrada — pulando.`);
+          continue;
+        }
+
+        for (const a of qAnswers) {
+          const shouldBeCorrect = a.id === target.id;
+          if (a.correct !== shouldBeCorrect) {
+            await db.update(answers).set({ correct: shouldBeCorrect }).where(eq(answers.id, a.id));
+          }
+        }
+        log.push(`Questão ${qNum}: gabarito = ${letter} ("${target.text}")`);
       }
-      log.push(`Questão ${qNum}: gabarito = ${letter} ("${target.text}")`);
+    }
+
+    if (images) {
+      const imgPairs = images
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      for (const pair of imgPairs) {
+        const idx = pair.indexOf(":");
+        if (idx < 0) {
+          log.push(`Imagem ignorada (formato inválido): "${pair}"`);
+          continue;
+        }
+        const qNum = Number(pair.slice(0, idx).trim());
+        const url = pair.slice(idx + 1).trim();
+        const question = examQuestions.find((q) => q.order === qNum);
+        if (!question || !url) {
+          log.push(`Imagem da questão ${qNum} não aplicada (questão ou URL inválida) — pulando.`);
+          continue;
+        }
+        await db.update(questions).set({ imageUrl: url }).where(eq(questions.id, question.id));
+        log.push(`Questão ${qNum}: imagem definida (${url}).`);
+      }
     }
 
     if (publish) {
