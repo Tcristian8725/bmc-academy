@@ -6,6 +6,24 @@ import {
   CERT_SAB_BADGE_JPG_BASE64,
 } from "./certificate-assets";
 
+/**
+ * Decodifica base64 numa cópia "limpa" de bytes (ArrayBuffer próprio, sempre
+ * com byteOffset 0). Necessário porque o `embedJpg` do pdf-lib lê o JPEG com
+ * `new DataView(imageData.buffer)` — usando o ArrayBuffer inteiro por trás do
+ * Buffer, ignorando `byteOffset`/`byteLength`. Isso funcionava em dev, mas
+ * quebrava em produção (Vercel, Node mais novo) com "SOI not found in JPEG":
+ * dependendo de como o Node aloca o Buffer do `Buffer.from(base64, "base64")"
+ * internamente, o resultado pode ser uma view com byteOffset != 0 dentro de
+ * um ArrayBuffer maior — o pdf-lib então lê os bytes errados do começo do
+ * ArrayBuffer, não do início real da imagem. `new Uint8Array(buffer)` (não
+ * `.slice()`/`.subarray()` do Buffer, que só criam uma NOVA VIEW sobre o
+ * mesmo ArrayBuffer) força uma cópia de verdade, com seu próprio ArrayBuffer
+ * dedicado começando em 0.
+ */
+function decodeBase64Clean(base64: string): Uint8Array {
+  return new Uint8Array(Buffer.from(base64, "base64"));
+}
+
 // Paleta extraída do modelo oficial de certificado BMC | Hyundai (arquivo de
 // referência "Certificado_Amarildo_Silva_de_Souza.pdf", enviado pelo Telles em
 // 16/09/2026) — mesmo azul-marinho e dourado da marca usados no papel timbrado
@@ -47,7 +65,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   const height = 640;
   const page = doc.addPage([width, height]);
 
-  const bgImage = await doc.embedJpg(Buffer.from(CERT_BACKGROUND_JPG_BASE64, "base64"));
+  const bgImage = await doc.embedJpg(decodeBase64Clean(CERT_BACKGROUND_JPG_BASE64));
   page.drawImage(bgImage, { x: 0, y: 0, width, height });
 
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -87,7 +105,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   };
 
   // Logo BMC | HYUNDAI
-  const logoImage = await doc.embedPng(Buffer.from(CERT_LOGO_PNG_BASE64, "base64"));
+  const logoImage = await doc.embedPng(decodeBase64Clean(CERT_LOGO_PNG_BASE64));
   const logoDims = logoImage.scale(1);
   const logoW = 230;
   const logoH = (logoW / logoDims.width) * logoDims.height;
@@ -138,7 +156,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   centerText(`Emitido em ${data.issuedAtLabel}`, height - 358, 12, fontItalic, rgb(0.3, 0.3, 0.3));
 
   // Selo SAB | BMC Hyundai
-  const badgeImage = await doc.embedJpg(Buffer.from(CERT_SAB_BADGE_JPG_BASE64, "base64"));
+  const badgeImage = await doc.embedJpg(decodeBase64Clean(CERT_SAB_BADGE_JPG_BASE64));
   const badgeDims = badgeImage.scale(1);
   const badgeW = 88;
   const badgeH = (badgeW / badgeDims.width) * badgeDims.height;
@@ -147,7 +165,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   // Cartão de validação (QR + código) — fundo branco translúcido para ficar
   // legível independente da foto de fundo por trás.
   const qrDataUrl = await QRCode.toDataURL(data.validationUrl, { margin: 0, width: 200 });
-  const qrImage = await doc.embedPng(Buffer.from(qrDataUrl.split(",")[1], "base64"));
+  const qrImage = await doc.embedPng(decodeBase64Clean(qrDataUrl.split(",")[1]));
   const qrSize = 58;
   const cardW = 250;
   const cardH = 78;
