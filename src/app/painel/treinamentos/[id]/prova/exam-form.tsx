@@ -10,6 +10,7 @@ type Question = {
   type: string;
   statement: string;
   explanation: string | null;
+  imageUrl?: string | null;
   answers: { id: string; text: string }[];
 };
 
@@ -89,6 +90,14 @@ export default function ExamForm({
             {questions.map((q) => (
               <div key={q.id} className="text-sm text-gray-600">
                 <p className="font-medium">{q.statement}</p>
+                {q.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={q.imageUrl}
+                    alt=""
+                    className="my-2 max-h-56 rounded-lg border border-gray-200 object-contain"
+                  />
+                )}
                 <p>
                   Correta(s):{" "}
                   {q.answers
@@ -125,6 +134,14 @@ export default function ExamForm({
             <p className="mb-3 font-medium text-foreground">
               {idx + 1}. {q.statement}
             </p>
+            {q.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={q.imageUrl}
+                alt={`Imagem da questão ${idx + 1}`}
+                className="mb-3 max-h-72 w-full rounded-lg border border-gray-200 object-contain"
+              />
+            )}
             <div className="space-y-2">
               {q.answers.map((a) => (
                 <label

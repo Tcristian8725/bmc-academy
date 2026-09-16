@@ -18,6 +18,7 @@ import {
   createExamAction,
   addQuestionAction,
   setCorrectAnswersAction,
+  setQuestionImageAction,
   deleteQuestionAction,
   assignUserAction,
   unassignUserAction,
@@ -249,6 +250,33 @@ export default async function TrainingDetailPage({
                       </form>
                     </div>
                   </div>
+
+                  {q.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={q.imageUrl}
+                      alt={`Imagem da questão ${idx + 1}`}
+                      className="mt-2 max-h-56 rounded-lg border border-gray-200 object-contain"
+                    />
+                  )}
+
+                  <form
+                    action={setQuestionImageAction.bind(null, id, q.id)}
+                    className="mt-2 flex items-center gap-2"
+                  >
+                    <input
+                      name="imageUrl"
+                      defaultValue={q.imageUrl ?? ""}
+                      placeholder="URL da imagem desta questão (opcional)"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Salvar imagem
+                    </button>
+                  </form>
 
                   <form
                     action={setCorrectAnswersAction.bind(null, id, q.id)}

@@ -138,6 +138,18 @@ export async function setCorrectAnswersAction(
   revalidatePath(`/admin/treinamentos/${trainingId}`);
 }
 
+export async function setQuestionImageAction(
+  trainingId: string,
+  questionId: string,
+  formData: FormData
+) {
+  const session = await assertAdmin();
+  const imageUrl = String(formData.get("imageUrl") || "").trim() || null;
+  await db.update(questions).set({ imageUrl }).where(eq(questions.id, questionId));
+  await logAudit(session.userId!, "QUESTION_IMAGE_UPDATED", { trainingId, questionId, imageUrl });
+  revalidatePath(`/admin/treinamentos/${trainingId}`);
+}
+
 export async function deleteQuestionAction(trainingId: string, questionId: string) {
   await assertAdmin();
   await db.delete(answers).where(eq(answers.questionId, questionId));
