@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { toEmbedUrl } from "@/lib/video";
 import { markLessonViewedAction } from "./actions";
 
 type Lesson = {
@@ -42,7 +43,7 @@ export default function LessonItem({
       {lesson.type === "VIDEO" && lesson.url && (
         <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
           <iframe
-            src={lesson.url}
+            src={toEmbedUrl(lesson.url)}
             className="h-full w-full"
             allowFullScreen
             title={lesson.title}
