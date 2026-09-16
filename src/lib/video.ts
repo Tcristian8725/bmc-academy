@@ -12,6 +12,19 @@
  * Links que não são do YouTube (Vimeo, etc.) ou que já estão no formato de
  * embed passam direto, sem alteração.
  */
+// `enablejsapi=1` é obrigatório para o player aceitar comandos/eventos via
+// postMessage (usado em lesson-item.tsx para medir quanto do vídeo foi
+// realmente assistido, em vez de confiar num botão manual "já assisti").
+function withJsApi(embedUrl: string): string {
+  try {
+    const u = new URL(embedUrl);
+    u.searchParams.set("enablejsapi", "1");
+    return u.toString();
+  } catch {
+    return embedUrl;
+  }
+}
+
 export function toEmbedUrl(url: string): string {
   let parsed: URL;
   try {
@@ -24,21 +37,30 @@ export function toEmbedUrl(url: string): string {
 
   if (host === "youtu.be") {
     const id = parsed.pathname.slice(1);
-    return id ? `https://www.youtube.com/embed/${id}` : url;
+    return id ? withJsApi(`https://www.youtube.com/embed/${id}`) : url;
   }
 
   if (host === "youtube.com") {
     if (parsed.pathname === "/watch") {
       const id = parsed.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : url;
+      return id ? withJsApi(`https://www.youtube.com/embed/${id}`) : url;
     }
     if (parsed.pathname.startsWith("/shorts/")) {
       const id = parsed.pathname.split("/")[2];
-      return id ? `https://www.youtube.com/embed/${id}` : url;
+      return id ? withJsApi(`https://www.youtube.com/embed/${id}`) : url;
     }
-    // já é /embed/... (ou outra rota do youtube) — mantém como está
-    return url;
+    // já é /embed/... (ou outra rota do youtube) — garante enablejsapi também
+    return withJsApi(url);
   }
 
   return url;
+}
+
+/** true quando a URL de embed é do YouTube (onde temos a IFrame API para medir o quanto foi assistido). */
+export function isYouTubeEmbed(embedUrl: string): boolean {
+  try {
+    return new URL(embedUrl).hostname.replace(/^www\./, "") === "youtube.com";
+  } catch {
+    return false;
+  }
 }

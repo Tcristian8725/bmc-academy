@@ -22,6 +22,13 @@
       "when": 1789587710494,
       "tag": "0002_add_certificate_pdf_data",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789594582635,
+      "tag": "0003_melodic_senator_kelly",
+      "breakpoints": true
     }
   ]
 }

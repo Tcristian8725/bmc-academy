@@ -4,6 +4,7 @@ import {
   trainingAssignments,
   trainings,
   lessons,
+  lessonProgress,
   progress as progressTable,
   exams,
   questions,
@@ -12,6 +13,11 @@ import {
   certificates,
   users,
 } from "@/db/schema";
+
+// Percentual mínimo assistido de um vídeo para a lição contar como concluída
+// (a pedido do Telles: sem isso, a prova não libera — ver reportVideoProgress
+// e assertLessonsCompletedForExam).
+export const WATCH_THRESHOLD_PERCENT = 70;
 import { logAudit } from "./audit";
 import {
   generateCertificateCode,
@@ -105,15 +111,51 @@ export async function getTrainingForUser(trainingId: string, userId: string) {
 
   const [exam] = await db.select().from(exams).where(eq(exams.trainingId, trainingId));
 
-  return { training, lessons: trainingLessons, progress: userProgress, exam };
+  // filtra pelas lições deste treinamento em memória (sem join) — o número
+  // de lições por usuário é sempre pequeno neste protótipo
+  const lessonProgressRows = trainingLessons.length
+    ? await db.select().from(lessonProgress).where(eq(lessonProgress.userId, userId))
+    : [];
+  const lessonIds = new Set(trainingLessons.map((l) => l.id));
+  const lessonProgressMap: Record<string, { watchedPercent: number; completed: boolean }> = {};
+  for (const row of lessonProgressRows) {
+    if (lessonIds.has(row.lessonId)) {
+      lessonProgressMap[row.lessonId] = {
+        watchedPercent: row.watchedPercent,
+        completed: row.completed,
+      };
+    }
+  }
+
+  return {
+    training,
+    lessons: trainingLessons,
+    progress: userProgress,
+    exam,
+    lessonProgress: lessonProgressMap,
+  };
 }
 
-export async function markLessonViewed(userId: string, trainingId: string, lessonId: string) {
+// Recalcula o progresso geral do treinamento (percentComplete/status) a
+// partir de quantas lições estão com `completed = true` em lessonProgress —
+// substitui o antigo cálculo por "cursor" (lição N vista = lições 1..N
+// vistas), que não fazia sentido depois que vídeo passou a exigir assistir
+// de verdade (o usuário pode completar as lições fora de ordem).
+async function recalcTrainingProgress(userId: string, trainingId: string, lastLessonId?: string) {
   const trainingLessons = await db
     .select()
     .from(lessons)
     .where(eq(lessons.trainingId, trainingId));
   const total = trainingLessons.length || 1;
+
+  const lessonIds = trainingLessons.map((l) => l.id);
+  const progressRows = lessonIds.length
+    ? await db.select().from(lessonProgress).where(eq(lessonProgress.userId, userId))
+    : [];
+  const completedCount = progressRows.filter(
+    (r) => lessonIds.includes(r.lessonId) && r.completed
+  ).length;
+  const percent = Math.min(100, Math.round((completedCount / total) * 100));
 
   let [current] = await db
     .select()
@@ -130,22 +172,119 @@ export async function markLessonViewed(userId: string, trainingId: string, lesso
     current = created;
   }
 
-  // marca a lição atual como "vista" avançando o cursor de "continuar de onde parou"
-  const idx = trainingLessons.findIndex((l) => l.id === lessonId);
-  const viewedCount = idx >= 0 ? idx + 1 : 1;
-  const percent = Math.min(100, Math.round((viewedCount / total) * 100));
-
   await db
     .update(progressTable)
     .set({
       status: current.status === "CONCLUIDO" ? "CONCLUIDO" : "EM_ANDAMENTO",
       startedAt: current.startedAt ?? now,
       lastAccessAt: now,
-      lastLessonId: lessonId,
-      percentComplete: Math.max(percent, current.percentComplete ?? 0),
+      lastLessonId: lastLessonId ?? current.lastLessonId,
+      percentComplete: current.status === "CONCLUIDO" ? 100 : percent,
       updatedAt: now,
     })
     .where(and(eq(progressTable.trainingId, trainingId), eq(progressTable.userId, userId)));
+}
+
+// Usado para lições SEM vídeo (TEXT/PDF/LINK/SLIDES) — o botão "Marcar como
+// concluída" continua existindo só para essas. Lições de VIDEO são marcadas
+// automaticamente por reportVideoProgress ao atingir WATCH_THRESHOLD_PERCENT.
+export async function markLessonViewed(userId: string, trainingId: string, lessonId: string) {
+  const [existing] = await db
+    .select()
+    .from(lessonProgress)
+    .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)));
+
+  const now = new Date().toISOString();
+
+  if (existing) {
+    await db
+      .update(lessonProgress)
+      .set({ watchedPercent: 100, completed: true, updatedAt: now })
+      .where(eq(lessonProgress.id, existing.id));
+  } else {
+    await db.insert(lessonProgress).values({
+      userId,
+      lessonId,
+      watchedPercent: 100,
+      completed: true,
+      updatedAt: now,
+    });
+  }
+
+  await recalcTrainingProgress(userId, trainingId, lessonId);
+}
+
+export interface ReportVideoProgressResult {
+  ok: boolean;
+  watchedPercent: number;
+  completed: boolean;
+}
+
+// Chamado periodicamente pelo player (client-side, via YouTube IFrame API)
+// com o maior percentual da barra de progresso já alcançado pelo usuário
+// (não soma de tempo assistido — dá pra pular pra frente, mas não dá pra
+// "marcar como visto" sem tocar no vídeo, que era o problema original).
+export async function reportVideoProgress(
+  userId: string,
+  trainingId: string,
+  lessonId: string,
+  watchedPercent: number
+): Promise<ReportVideoProgressResult> {
+  const clamped = Math.max(0, Math.min(100, watchedPercent));
+
+  const [existing] = await db
+    .select()
+    .from(lessonProgress)
+    .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.lessonId, lessonId)));
+
+  const bestPercent = Math.max(clamped, existing?.watchedPercent ?? 0);
+  const completed = bestPercent >= WATCH_THRESHOLD_PERCENT;
+  const now = new Date().toISOString();
+
+  if (existing) {
+    if (bestPercent !== existing.watchedPercent || completed !== existing.completed) {
+      await db
+        .update(lessonProgress)
+        .set({ watchedPercent: bestPercent, completed, updatedAt: now })
+        .where(eq(lessonProgress.id, existing.id));
+    }
+  } else {
+    await db.insert(lessonProgress).values({
+      userId,
+      lessonId,
+      watchedPercent: bestPercent,
+      completed,
+      updatedAt: now,
+    });
+  }
+
+  await recalcTrainingProgress(userId, trainingId, completed ? lessonId : undefined);
+
+  return { ok: true, watchedPercent: bestPercent, completed };
+}
+
+// Confere se TODAS as lições do treinamento estão concluídas (para vídeo,
+// significa ter assistido pelo menos WATCH_THRESHOLD_PERCENT%) — usado tanto
+// para decidir se mostra o botão "Iniciar prova" quanto, principalmente,
+// como trava do lado do servidor em submitExamAttempt (nunca confiar só na
+// UI: dá pra acessar a URL da prova direto).
+export async function allLessonsCompleted(userId: string, trainingId: string): Promise<boolean> {
+  const trainingLessons = await db
+    .select()
+    .from(lessons)
+    .where(eq(lessons.trainingId, trainingId));
+  if (trainingLessons.length === 0) return true;
+
+  const lessonIds = trainingLessons.map((l) => l.id);
+  const progressRows = await db
+    .select()
+    .from(lessonProgress)
+    .where(eq(lessonProgress.userId, userId));
+
+  const completedIds = new Set(
+    progressRows.filter((r) => r.completed).map((r) => r.lessonId)
+  );
+  return lessonIds.every((id) => completedIds.has(id));
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +339,17 @@ export async function submitExamAttempt(
 ): Promise<SubmitExamResult> {
   const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
   if (!exam) return { ok: false, error: "Prova não encontrada." };
+
+  // Trava do lado do servidor: mesmo que alguém acesse a URL da prova direto
+  // (sem passar pela tela do treinamento), não deixa enviar sem ter assistido
+  // o vídeo (e concluído as demais lições) primeiro.
+  const canTakeExam = await allLessonsCompleted(userId, exam.trainingId);
+  if (!canTakeExam) {
+    return {
+      ok: false,
+      error: `É preciso assistir pelo menos ${WATCH_THRESHOLD_PERCENT}% do vídeo (e concluir as demais lições) antes de fazer a prova.`,
+    };
+  }
 
   const previousAttempts = await db
     .select()

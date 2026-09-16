@@ -15,11 +15,11 @@ export default async function TrainingPlayerPage({
 
   if (!data) notFound();
 
-  const { training, lessons, progress, exam } = data;
+  const { training, lessons, progress, exam, lessonProgress } = data;
 
-  const lastLessonOrder = progress.lastLessonId
-    ? lessons.find((l) => l.id === progress.lastLessonId)?.order ?? -1
-    : -1;
+  const allDone =
+    progress.status === "CONCLUIDO" ||
+    lessons.every((l) => lessonProgress[l.id]?.completed);
 
   return (
     <div className="space-y-6">
@@ -46,7 +46,10 @@ export default async function TrainingPlayerPage({
             key={lesson.id}
             lesson={lesson}
             trainingId={training.id}
-            viewed={lesson.order <= lastLessonOrder || progress.status === "CONCLUIDO"}
+            completed={
+              progress.status === "CONCLUIDO" || Boolean(lessonProgress[lesson.id]?.completed)
+            }
+            watchedPercent={lessonProgress[lesson.id]?.watchedPercent ?? 0}
           />
         ))}
       </div>
@@ -59,12 +62,18 @@ export default async function TrainingPlayerPage({
               ? "Você já foi aprovado neste treinamento."
               : `Nota mínima para aprovação: ${exam.minScorePercent}%. Tentativas permitidas: ${exam.maxAttempts}.`}
           </p>
-          <Link
-            href={`/painel/treinamentos/${training.id}/prova`}
-            className="inline-block rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-          >
-            {progress.status === "CONCLUIDO" ? "Ver prova / certificado" : "Iniciar prova"}
-          </Link>
+          {allDone ? (
+            <Link
+              href={`/painel/treinamentos/${training.id}/prova`}
+              className="inline-block rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+            >
+              {progress.status === "CONCLUIDO" ? "Ver prova / certificado" : "Iniciar prova"}
+            </Link>
+          ) : (
+            <span className="inline-block cursor-not-allowed rounded-lg bg-gray-300 px-4 py-2 text-sm font-semibold text-gray-600">
+              Assista pelo menos 70% do vídeo (e conclua as demais lições) para liberar a prova
+            </span>
+          )}
         </div>
       )}
     </div>

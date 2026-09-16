@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { getTrainingForUser, getExamPlayerData } from "@/lib/training-flow";
+import { getTrainingForUser, getExamPlayerData, allLessonsCompleted } from "@/lib/training-flow";
 import ExamForm from "./exam-form";
 
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,6 +9,32 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
   const session = await requireUser(["TECNICO", "RC"]);
   const trainingData = await getTrainingForUser(id, session.userId!);
   if (!trainingData || !trainingData.exam) notFound();
+
+  // Trava do lado do servidor (além do bloqueio dentro de submitExamAttempt):
+  // se o usuário já foi aprovado antes não precisamos checar de novo, mas
+  // enquanto não concluiu, só mostramos a prova depois de assistir o vídeo.
+  if (trainingData.progress.status !== "CONCLUIDO") {
+    const canTakeExam = await allLessonsCompleted(session.userId!, id);
+    if (!canTakeExam) {
+      return (
+        <div className="space-y-4">
+          <Link
+            href={`/painel/treinamentos/${id}`}
+            className="text-sm text-brand hover:underline"
+          >
+            ← {trainingData.training.title}
+          </Link>
+          <div className="rounded-xl border border-dashed border-amber-400/60 bg-amber-50 p-5">
+            <h2 className="font-semibold text-foreground">Prova bloqueada</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              É preciso assistir pelo menos 70% do vídeo (e concluir as demais lições) antes de
+              fazer a prova.
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
 
   const examData = await getExamPlayerData(trainingData.exam.id, session.userId!);
   if (!examData) notFound();

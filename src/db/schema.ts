@@ -131,6 +131,23 @@ export const lessons = pgTable("lessons", {
   ...timestamps(),
 });
 
+// Progresso de visualização por lição — em especial, quanto de cada vídeo o
+// usuário efetivamente assistiu (não só "abriu a página"). A prova só libera
+// quando TODAS as lições do treinamento estão com `completed = true`, e para
+// lições de vídeo isso só acontece automaticamente ao atingir o mínimo de
+// assistido (ver WATCH_THRESHOLD_PERCENT em training-flow.ts) — não existe
+// mais um botão manual de "marcar como concluída" para vídeo.
+export const lessonProgress = pgTable("lesson_progress", {
+  id: id(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  lessonId: text("lesson_id").references(() => lessons.id).notNull(),
+  watchedPercent: doublePrecision("watched_percent").notNull().default(0), // maior % já atingido do vídeo (posição mais distante alcançada, não soma de tempo assistido)
+  completed: boolean("completed").notNull().default(false),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true })
+    .default(sql`now()`)
+    .notNull(),
+});
+
 // --- Trilhas de aprendizagem -------------------------------------------------
 
 export const learningPaths = pgTable("learning_paths", {
