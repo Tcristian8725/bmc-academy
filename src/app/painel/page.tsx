@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listAssignmentsForUser } from "@/lib/training-flow";
+import TvPanel from "./tv-panel";
 
 const statusLabel: Record<string, string> = {
   NAO_INICIADO: "Não iniciado",
@@ -102,26 +103,6 @@ export default async function PainelPage() {
       </div>
 
       <TvPanel />
-    </div>
-  );
-}
-
-function TvPanel() {
-  return (
-    <div className="xl:sticky xl:top-8 xl:self-start">
-      <div className="overflow-hidden rounded-2xl bg-gray-900 p-2 shadow-sm ring-1 ring-black/5">
-        <video
-          className="aspect-video w-full rounded-xl object-cover"
-          src="/branding/tv-maquinas-hyundai.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-        />
-        <p className="px-1 pb-1 pt-2 text-center text-[11px] font-medium uppercase tracking-wide text-white/60">
-          Linha Amarela Hyundai
-        </p>
-      </div>
     </div>
   );
 }
