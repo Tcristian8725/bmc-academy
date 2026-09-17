@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/logout";
 
@@ -21,10 +22,14 @@ export default function TopNav({
     <header className="sticky top-0 z-10 border-b border-black/5 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 rounded-lg bg-brand px-3 py-1.5">
-            <span className="text-sm font-extrabold tracking-tight text-white">
-              BMC <span className="mx-0.5 font-light">|</span> HYUNDAI
-            </span>
+          <div className="flex items-center rounded-lg bg-white px-3 py-1.5 ring-1 ring-black/5">
+            <Image
+              src="/branding/logo.png"
+              alt="BMC | Hyundai"
+              width={220}
+              height={32}
+              className="h-6 w-auto"
+            />
           </div>
           <nav className="hidden gap-4 sm:flex">
             {links.map((l) => (
