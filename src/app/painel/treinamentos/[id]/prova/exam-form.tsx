@@ -84,30 +84,49 @@ export default function ExamForm({
           </Link>
         )}
 
-        {result.correctByQuestion && (
+        {result.isCorrectByQuestion && (
           <div className="mt-6 space-y-3 border-t border-black/10 pt-4">
-            <p className="text-sm font-medium text-gray-700">Gabarito:</p>
-            {questions.map((q) => (
-              <div key={q.id} className="text-sm text-gray-600">
-                <p className="font-medium">{q.statement}</p>
-                {q.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={q.imageUrl}
-                    alt=""
-                    className="my-2 max-h-56 rounded-lg border border-gray-200 object-contain"
-                  />
-                )}
-                <p>
-                  Correta(s):{" "}
-                  {q.answers
-                    .filter((a) => result.correctByQuestion?.[q.id]?.includes(a.id))
-                    .map((a) => a.text)
-                    .join(", ")}
-                </p>
-                {q.explanation && <p className="italic text-gray-500">{q.explanation}</p>}
-              </div>
-            ))}
+            <p className="text-sm font-medium text-gray-700">Resultado por questão:</p>
+            {questions.map((q, idx) => {
+              const acertou = result.isCorrectByQuestion?.[q.id];
+              return (
+                <div key={q.id} className="text-sm text-gray-600">
+                  <p className="font-medium">
+                    {idx + 1}. {q.statement}{" "}
+                    <span
+                      className={acertou ? "text-emerald-600" : "text-red-600"}
+                    >
+                      {acertou ? "✓ Você acertou" : "✗ Você errou"}
+                    </span>
+                  </p>
+                  {q.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={q.imageUrl}
+                      alt=""
+                      className="my-2 max-h-56 rounded-lg border border-gray-200 object-contain"
+                    />
+                  )}
+                  {acertou ? (
+                    <>
+                      <p>
+                        Correta(s):{" "}
+                        {q.answers
+                          .filter((a) => result.correctByQuestion?.[q.id]?.includes(a.id))
+                          .map((a) => a.text)
+                          .join(", ")}
+                      </p>
+                      {q.explanation && <p className="italic text-gray-500">{q.explanation}</p>}
+                    </>
+                  ) : (
+                    <p className="italic text-gray-400">
+                      Resposta correta não exibida — revise o conteúdo do treinamento antes de
+                      tentar novamente.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

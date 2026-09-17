@@ -328,7 +328,14 @@ export interface SubmitExamResult {
   error?: string;
   scorePercent?: number;
   passed?: boolean;
+  // Só traz a resposta certa das questões que a pessoa ACERTOU. Para as que
+  // errou, o id fica de fora de propósito (ver isCorrectByQuestion) — pedido
+  // do Telles: "não aparecer a resposta correta da pergunta que ele errou,
+  // para não somente pegar a resposta e refazer a prova".
   correctByQuestion?: Record<string, string[]>;
+  // Acertou/errou por questão, pra UI poder mostrar ✅/❌ mesmo sem revelar
+  // qual era a resposta certa nas que errou.
+  isCorrectByQuestion?: Record<string, boolean>;
   certificateUrl?: string;
 }
 
@@ -364,18 +371,26 @@ export async function submitExamAttempt(
 
   let totalPoints = 0;
   let earnedPoints = 0;
+  // Só guarda a resposta certa das questões acertadas — nas erradas, o id
+  // fica de fora do mapa de propósito, pra tela de resultado não conseguir
+  // revelar a resposta certa de nenhuma questão que a pessoa errou.
   const correctByQuestion: Record<string, string[]> = {};
+  const isCorrectByQuestion: Record<string, boolean> = {};
 
   for (const q of examQuestions) {
     totalPoints += q.points;
     const qAnswers = await db.select().from(answers).where(eq(answers.questionId, q.id));
     const correctIds = qAnswers.filter((a) => a.correct).map((a) => a.id).sort();
-    correctByQuestion[q.id] = correctIds;
 
     const given = (responses[q.id] ?? []).slice().sort();
     const isCorrect =
       given.length === correctIds.length && given.every((id, i) => id === correctIds[i]);
-    if (isCorrect) earnedPoints += q.points;
+
+    isCorrectByQuestion[q.id] = isCorrect;
+    if (isCorrect) {
+      correctByQuestion[q.id] = correctIds;
+      earnedPoints += q.points;
+    }
   }
 
   const scorePercent = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
@@ -404,6 +419,7 @@ export async function submitExamAttempt(
     scorePercent,
     passed,
     correctByQuestion: exam.showAnswersAfter ? correctByQuestion : undefined,
+    isCorrectByQuestion: exam.showAnswersAfter ? isCorrectByQuestion : undefined,
     certificateUrl,
   };
 }
