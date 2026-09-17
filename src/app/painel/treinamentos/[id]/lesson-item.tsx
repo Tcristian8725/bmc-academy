@@ -40,9 +40,19 @@ function loadYouTubeIframeApi(): Promise<void> {
 }
 
 // Player YouTube com a API JS: mede o quanto do vídeo o usuário já assistiu
-// de verdade (maior posição já alcançada), em vez de um botão manual
-// "marcar como concluída" — a pedido do Telles, a prova só libera depois de
-// pelo menos WATCH_THRESHOLD_PERCENT% assistido de fato.
+// de verdade, em vez de um botão manual "marcar como concluída" — a pedido
+// do Telles, a prova só libera depois de pelo menos WATCH_THRESHOLD_PERCENT%
+// assistido de fato.
+//
+// Importante: a medição é por TEMPO REAL DE REPRODUÇÃO acumulado (quantos
+// segundos o vídeo passou tocando de verdade), não pela posição/timestamp
+// atual do vídeo. A primeira versão usava a posição atual (maior ponto já
+// alcançado) e isso permitia burlar avançando a barra do vídeo direto pro
+// final sem assistir nada — o Telles pediu para permitir adiantar/atrasar a
+// vontade, mas exigindo que a pessoa fique de fato reproduzindo o vídeo por
+// pelo menos 70% da duração total. Como a contagem é por tempo tocado (um
+// intervalo a cada segundo, só enquanto o player está em PLAYING), pular
+// posição não adianta nada — só o tempo real com o vídeo tocando conta.
 function YouTubeGatedPlayer({
   embedUrl,
   title,
@@ -67,6 +77,12 @@ function YouTubeGatedPlayer({
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSentRef = useRef(initialWatchedPercent);
+  // Segundos de reprodução real já acumulados (não é posição do vídeo).
+  // Inicializado a partir do `initialWatchedPercent` assim que soubermos a
+  // duração de verdade do vídeo (ver `ensureInitialized` abaixo).
+  const accumulatedSecondsRef = useRef(0);
+  const initializedRef = useRef(false);
+  const lastTickAtRef = useRef<number | null>(null);
   const [watchedPercent, setWatchedPercent] = useState(initialWatchedPercent);
   const [completed, setCompleted] = useState(initialCompleted);
 
@@ -87,16 +103,41 @@ function YouTubeGatedPlayer({
         onProgress(rounded, Boolean(result?.completed));
       };
 
+      // Na primeira vez que conseguimos a duração real do vídeo, convertemos
+      // o `initialWatchedPercent` (vindo do banco) de volta pra segundos, pra
+      // continuar de onde parou em vez de zerar o acumulado.
+      const ensureInitialized = (duration: number) => {
+        if (initializedRef.current || !duration) return;
+        accumulatedSecondsRef.current = (initialWatchedPercent / 100) * duration;
+        initializedRef.current = true;
+      };
+
       const startPolling = () => {
         if (pollRef.current) return;
+        lastTickAtRef.current = Date.now();
         pollRef.current = setInterval(() => {
           const player = playerRef.current;
           if (!player) return;
           const duration = player.getDuration();
-          const current = player.getCurrentTime();
           if (!duration) return;
-          send((current / duration) * 100);
-        }, 3000);
+          ensureInitialized(duration);
+
+          // Tempo real passado desde o último tick (não a posição do vídeo)
+          // — assim, avançar/retroceder a barra não pula etapa nenhuma: só
+          // conta o tempo em que o vídeo esteve de fato tocando. O cap de 2s
+          // evita contar de mais se a aba ficou em segundo plano e o
+          // navegador atrasou o timer.
+          const now = Date.now();
+          const last = lastTickAtRef.current ?? now;
+          const elapsed = Math.min((now - last) / 1000, 2);
+          lastTickAtRef.current = now;
+
+          accumulatedSecondsRef.current = Math.min(
+            duration,
+            accumulatedSecondsRef.current + elapsed
+          );
+          send((accumulatedSecondsRef.current / duration) * 100);
+        }, 1000);
       };
 
       const stopPolling = () => {
@@ -104,6 +145,7 @@ function YouTubeGatedPlayer({
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
+        lastTickAtRef.current = null;
       };
 
       new YT.Player(iframeId.current, {
@@ -114,9 +156,16 @@ function YouTubeGatedPlayer({
           onStateChange: (e: { data: number; target: typeof playerRef.current }) => {
             playerRef.current = e.target;
             // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
-            if (e.data === 1) startPolling();
-            else stopPolling();
-            if (e.data === 0 && playerRef.current) send(100);
+            if (e.data === 1) {
+              startPolling();
+            } else {
+              stopPolling();
+              // O vídeo pode "terminar" (ENDED) sem ter sido de fato
+              // assistido (ex.: a pessoa pulou direto pro final) — reporta
+              // o acumulado real, sem forçar 100% automaticamente.
+              const duration = e.target?.getDuration?.();
+              if (duration) send((accumulatedSecondsRef.current / duration) * 100);
+            }
           },
         },
       });
