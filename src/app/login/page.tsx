@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import BackgroundMusic from "./background-music";
 import LoginForm from "./login-form";
 
 export default function LoginPage() {
@@ -14,7 +13,6 @@ export default function LoginPage() {
         className="object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/70" />
-      <BackgroundMusic />
 
       <div className="relative w-full max-w-sm">
         <div className="mb-5 text-center">
