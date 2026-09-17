@@ -20,6 +20,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db } from "@/db";
 import { ensureRealAdmin, seedIfEmpty } from "@/db/seed-safe";
 import { importRealExams } from "@/db/import-real-exams";
+import { syncAllPublishedTrainingAssignments } from "@/lib/assignments";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -54,6 +55,12 @@ export async function GET(req: NextRequest) {
     const importLog = await importRealExams();
     log.push(...importLog);
 
+    // Pega quem ficou pra trás: contas criadas depois de um treinamento já
+    // publicado nunca recebiam a atribuição automaticamente antes desta
+    // rotina existir (rodada 14).
+    const syncMsg = await syncAllPublishedTrainingAssignments();
+    log.push(syncMsg);
+
     log.push("Configuração concluída com sucesso.");
     return NextResponse.json({ ok: true, log });
   } catch (err) {
@@ -61,4 +68,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, log }, { status: 500 });
   }
 }
-// redeploy trigger 2026-09-16T21:03:58Z - novo SETUP_TOKEN

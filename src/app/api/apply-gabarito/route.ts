@@ -12,7 +12,11 @@
  *     &minScorePercent=80               (opcional — muda a nota mínima de aprovação da prova)
  *     &videoUrl=https://youtube.com/...  (opcional — cadastra/atualiza o vídeo da entrega técnica)
  *     &videoTitle=Vídeo ...              (opcional — título da lição de vídeo, tem um padrão)
- *     &publish=true                     (opcional — publica o treinamento e atribui a TECNICO/RC)
+ *     &publish=true                     (opcional — publica o treinamento e atribui ao público-alvo)
+ *     &audience=TECNICO,RC              (opcional — quem recebe automaticamente; ver AUDIENCE_ROLES
+ *                                         em src/lib/assignments.ts. Se não informado, mantém o
+ *                                         público-alvo atual do treinamento, ou TECNICO,RC por padrão
+ *                                         se for a primeira vez.)
  *
  * Seguro de rodar mais de uma vez (idempotente) — só atualiza qual alternativa
  * está marcada como correta em cada questão informada; nunca apaga nada, exceto
@@ -20,14 +24,17 @@
  * lição de vídeo real quando videoUrl é informado.
  *
  * `publish=true` também atribui o treinamento (obrigatório) a todos os
- * usuários TECNICO/RC já cadastrados, para ficar de fato disponível pra
- * quem precisa fazer a prova — publicar sozinho não deixava visível em
- * "Meus treinamentos" sem uma atribuição manual pelo admin.
+ * usuários ativos cujo papel bate com `audience` (ou o público-alvo já salvo
+ * do treinamento) — publicar sozinho não deixava visível em "Meus
+ * treinamentos" sem uma atribuição manual pelo admin. Pedido do Telles
+ * (rodada 14): antes de publicar um treinamento novo, perguntar a ele se é
+ * pra Técnico, RC ou Funcionário BMC, em vez de assumir TECNICO+RC sempre.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { trainings, exams, questions, answers, lessons, trainingAssignments, users } from "@/db/schema";
+import { trainings, exams, questions, answers, lessons } from "@/db/schema";
+import { formatAudienceRoles, syncTrainingAssignments } from "@/lib/assignments";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -55,6 +62,7 @@ export async function GET(req: NextRequest) {
   const videoUrl = req.nextUrl.searchParams.get("videoUrl");
   const videoTitle = req.nextUrl.searchParams.get("videoTitle") || "Vídeo da Entrega Técnica";
   const publish = req.nextUrl.searchParams.get("publish") === "true";
+  const audienceRaw = req.nextUrl.searchParams.get("audience");
 
   if (!examCode || (!key && !images && !minScorePercentRaw && !videoUrl)) {
     return NextResponse.json(
@@ -203,6 +211,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    if (audienceRaw) {
+      const audienceFormatted = formatAudienceRoles(audienceRaw.split(","));
+      await db
+        .update(trainings)
+        .set({ audienceRoles: audienceFormatted })
+        .where(eq(trainings.id, training.id));
+      log.push(`Público-alvo definido: ${audienceFormatted}.`);
+    }
+
     if (publish) {
       await db
         .update(trainings)
@@ -210,34 +227,15 @@ export async function GET(req: NextRequest) {
         .where(eq(trainings.id, training.id));
       log.push("Treinamento publicado.");
 
-      // Atribui o treinamento (obrigatório) a todos os TECNICO/RC já
-      // cadastrados — publicar sozinho não deixa o treinamento visível em
-      // "Meus treinamentos" de ninguém sem uma atribuição.
-      const targetUsers = await db
-        .select()
-        .from(users)
-        .where(inArray(users.role, ["TECNICO", "RC"]));
-
-      const existingAssignments = await db
-        .select()
-        .from(trainingAssignments)
-        .where(eq(trainingAssignments.trainingId, training.id));
-      const alreadyAssignedUserIds = new Set(existingAssignments.map((a) => a.userId));
-
-      let assignedCount = 0;
-      for (const u of targetUsers) {
-        if (alreadyAssignedUserIds.has(u.id)) continue;
-        await db.insert(trainingAssignments).values({
-          trainingId: training.id,
-          userId: u.id,
-          required: true,
-        });
-        assignedCount++;
-      }
+      // Atribui o treinamento (obrigatório) a todos os usuários ativos cujo
+      // papel bate com o público-alvo do treinamento (audienceRoles) —
+      // publicar sozinho não deixa o treinamento visível em "Meus
+      // treinamentos" de ninguém sem uma atribuição.
+      const assignedCount = await syncTrainingAssignments(training.id);
       if (assignedCount > 0) {
-        log.push(`Treinamento atribuído (obrigatório) a ${assignedCount} usuário(s) TECNICO/RC.`);
+        log.push(`Treinamento atribuído (obrigatório) a ${assignedCount} usuário(s).`);
       } else {
-        log.push("Todos os usuários TECNICO/RC já tinham esse treinamento atribuído.");
+        log.push("Todos os usuários do público-alvo já tinham esse treinamento atribuído.");
       }
     }
 

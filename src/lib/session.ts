@@ -1,7 +1,7 @@
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 
-export type UserRole = "ADMIN" | "GESTOR" | "TECNICO" | "RC";
+export type UserRole = "ADMIN" | "GESTOR" | "TECNICO" | "RC" | "FUNCIONARIO";
 
 export interface SessionData {
   userId?: string;

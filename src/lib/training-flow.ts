@@ -489,6 +489,7 @@ export async function issueCertificateForTraining(
     GESTOR: "Gestor",
     TECNICO: "Técnico",
     RC: "Representante Comercial",
+    FUNCIONARIO: "Funcionário BMC",
   };
 
   const managerEmail = certificateApprovedManagerEmail({

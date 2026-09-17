@@ -14,6 +14,7 @@ import {
   users,
 } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
+import { formatAudienceRoles, syncTrainingAssignments } from "@/lib/assignments";
 
 async function assertAdmin() {
   return requireUser(["ADMIN"]);
@@ -28,8 +29,29 @@ export async function togglePublishAction(trainingId: string, published: boolean
   await logAudit(session.userId!, published ? "TRAINING_PUBLISHED" : "TRAINING_UNPUBLISHED", {
     trainingId,
   });
+  // Publicar sozinho não deixa o treinamento visível em "Meus treinamentos"
+  // de ninguém sem uma atribuição — atribui automaticamente a quem já bate
+  // com o público-alvo salvo do treinamento (ver "Público-alvo" na página).
+  if (published) {
+    await syncTrainingAssignments(trainingId);
+  }
   revalidatePath(`/admin/treinamentos/${trainingId}`);
   revalidatePath("/admin/treinamentos");
+}
+
+export async function setAudienceAction(trainingId: string, formData: FormData) {
+  const session = await assertAdmin();
+  const roles = formData.getAll("audienceRole") as string[];
+  const audienceRoles = formatAudienceRoles(roles);
+
+  await db.update(trainings).set({ audienceRoles }).where(eq(trainings.id, trainingId));
+  await logAudit(session.userId!, "TRAINING_AUDIENCE_UPDATED", { trainingId, audienceRoles });
+
+  const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
+  if (training?.published) {
+    await syncTrainingAssignments(trainingId);
+  }
+  revalidatePath(`/admin/treinamentos/${trainingId}`);
 }
 
 export async function addLessonAction(trainingId: string, formData: FormData) {

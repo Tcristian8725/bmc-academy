@@ -6,6 +6,7 @@ import { requireUser, hashPassword } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
+import { assignPublishedTrainingsToUser } from "@/lib/assignments";
 
 export interface UserFormState {
   error?: string;
@@ -25,7 +26,8 @@ export async function createUserAction(
     | "ADMIN"
     | "GESTOR"
     | "TECNICO"
-    | "RC";
+    | "RC"
+    | "FUNCIONARIO";
   const position = String(formData.get("position") || "") || null;
   const managerId = String(formData.get("managerId") || "") || null;
 
@@ -43,9 +45,17 @@ export async function createUserAction(
 
   const passwordHash = await hashPassword(password);
 
-  await db.insert(users).values({ name, email, passwordHash, role, position, managerId });
+  const [created] = await db
+    .insert(users)
+    .values({ name, email, passwordHash, role, position, managerId })
+    .returning();
 
   await logAudit(session.userId!, "USER_CREATED", { email, role });
+
+  // Pedido do Telles (rodada 14): quem entra já recebe todos os treinamentos
+  // publicados que já existem pro perfil dele, sem precisar de atribuição
+  // manual uma a uma.
+  await assignPublishedTrainingsToUser(created.id, role);
 
   revalidatePath("/admin/usuarios");
   return { success: true };
@@ -59,11 +69,21 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
     return;
   }
 
-  const role = String(formData.get("role") || "") as "ADMIN" | "GESTOR" | "TECNICO" | "RC";
-  if (!["ADMIN", "GESTOR", "TECNICO", "RC"].includes(role)) return;
+  const role = String(formData.get("role") || "") as
+    | "ADMIN"
+    | "GESTOR"
+    | "TECNICO"
+    | "RC"
+    | "FUNCIONARIO";
+  if (!["ADMIN", "GESTOR", "TECNICO", "RC", "FUNCIONARIO"].includes(role)) return;
 
   await db.update(users).set({ role }).where(eq(users.id, userId));
   await logAudit(session.userId!, "USER_ROLE_CHANGED", { userId, role });
+
+  // Mudou de perfil? Garante que já fique com os treinamentos publicados do
+  // novo perfil (nunca remove os que já tinha do perfil anterior).
+  await assignPublishedTrainingsToUser(userId, role);
+
   revalidatePath("/admin/usuarios");
 }
 

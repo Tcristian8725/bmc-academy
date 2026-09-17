@@ -48,7 +48,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(), // login — de preferência o e-mail usado no SAB
   passwordHash: text("password_hash").notNull(),
   role: text("role", {
-    enum: ["ADMIN", "GESTOR", "TECNICO", "RC"],
+    enum: ["ADMIN", "GESTOR", "TECNICO", "RC", "FUNCIONARIO"],
   }).notNull(),
   registrationNumber: text("registration_number"), // matrícula
   phone: text("phone"),
@@ -109,7 +109,13 @@ export const trainings = pgTable("trainings", {
       "POS_VENDAS",
     ],
   }).notNull(),
-  targetAudience: text("target_audience"), // público-alvo
+  targetAudience: text("target_audience"), // público-alvo (texto livre, exibido pra pessoa)
+  // Público-alvo de verdade, usado pra decidir quem recebe o treinamento
+  // automaticamente (seção "Nova trava" / rodada 14): lista separada por
+  // vírgula de papéis, ex.: "TECNICO,RC" ou "FUNCIONARIO". Papéis válidos:
+  // TECNICO, RC, FUNCIONARIO (Funcionário BMC). Default mantém o
+  // comportamento histórico (TECNICO+RC) pros treinamentos já existentes.
+  audienceRoles: text("audience_roles").notNull().default("TECNICO,RC"),
   equipmentModelId: text("equipment_model_id").references(() => equipmentModels.id),
   workloadHours: doublePrecision("workload_hours"), // carga horária
   instructor: text("instructor"),

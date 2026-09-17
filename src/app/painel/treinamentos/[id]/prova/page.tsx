@@ -6,7 +6,7 @@ import ExamForm from "./exam-form";
 
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   const trainingData = await getTrainingForUser(id, session.userId!);
   if (!trainingData || !trainingData.exam) notFound();
 

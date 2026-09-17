@@ -35,6 +35,7 @@ export default function UserForm({
             >
               <option value="TECNICO">Técnico</option>
               <option value="RC">RC / Representante Comercial</option>
+              <option value="FUNCIONARIO">Funcionário BMC</option>
               <option value="GESTOR">Gestor</option>
               <option value="ADMIN">Administrador</option>
             </select>

@@ -7,6 +7,6 @@ export async function submitExamAction(
   examId: string,
   responses: Record<string, string[]>
 ): Promise<SubmitExamResult> {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   return submitExamAttempt(session.userId!, examId, responses);
 }

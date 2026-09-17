@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import TopNav from "@/components/top-nav";
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
 
   return (
     <div className="min-h-screen bg-background">

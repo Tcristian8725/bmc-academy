@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import {
   togglePublishAction,
+  setAudienceAction,
   addLessonAction,
   deleteLessonAction,
   createExamAction,
@@ -23,6 +24,13 @@ import {
   assignUserAction,
   unassignUserAction,
 } from "./actions";
+import { parseAudienceRoles } from "@/lib/assignments";
+
+const AUDIENCE_OPTIONS = [
+  ["TECNICO", "Técnico"],
+  ["RC", "RC / Representante Comercial"],
+  ["FUNCIONARIO", "Funcionário BMC"],
+] as const;
 
 const LESSON_TYPES = [
   ["TEXT", "Texto"],
@@ -82,8 +90,12 @@ export default async function TrainingDetailPage({
 
   const assignedIds = new Set(assignments.map((a) => a.userId));
   const availableUsers = (await db.select().from(users).where(eq(users.active, true))).filter(
-    (u) => !assignedIds.has(u.id) && (u.role === "TECNICO" || u.role === "RC")
+    (u) =>
+      !assignedIds.has(u.id) &&
+      (u.role === "TECNICO" || u.role === "RC" || u.role === "FUNCIONARIO")
   );
+
+  const currentAudience = parseAudienceRoles(training.audienceRoles);
 
   return (
     <div className="space-y-8">
@@ -107,6 +119,36 @@ export default async function TrainingDetailPage({
           </button>
         </form>
       </div>
+
+      {/* Público-alvo: quem recebe este treinamento automaticamente */}
+      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
+        <h2 className="text-sm font-semibold text-foreground">Público-alvo</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Quando publicado, o treinamento é atribuído automaticamente (obrigatório) a todo usuário
+          ativo de um dos perfis marcados abaixo. Marcar um perfil novo aqui já atribui na hora,
+          sem precisar despublicar/republicar.
+        </p>
+        <form action={setAudienceAction.bind(null, training.id)} className="mt-3 flex flex-wrap items-center gap-4">
+          {AUDIENCE_OPTIONS.map(([v, l]) => (
+            <label key={v} className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                name="audienceRole"
+                value={v}
+                defaultChecked={currentAudience.includes(v)}
+                className="accent-[--color-brand]"
+              />
+              {l}
+            </label>
+          ))}
+          <button
+            type="submit"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Salvar público-alvo
+          </button>
+        </form>
+      </section>
 
       {/* Conteúdo / Lições */}
       <section className="space-y-4">

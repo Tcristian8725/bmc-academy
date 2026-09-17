@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { markLessonViewed, reportVideoProgress } from "@/lib/training-flow";
 
 export async function markLessonViewedAction(trainingId: string, lessonId: string) {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   await markLessonViewed(session.userId!, trainingId, lessonId);
   revalidatePath(`/painel/treinamentos/${trainingId}`);
   revalidatePath("/painel");
@@ -22,6 +22,6 @@ export async function reportVideoProgressAction(
   lessonId: string,
   watchedPercent: number
 ) {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   return reportVideoProgress(session.userId!, trainingId, lessonId, watchedPercent);
 }

@@ -9,11 +9,13 @@ const roleLabel: Record<string, string> = {
   GESTOR: "Gestor",
   TECNICO: "Técnico",
   RC: "RC",
+  FUNCIONARIO: "Funcionário BMC",
 };
 
 const ROLE_OPTIONS = [
   ["TECNICO", "Técnico"],
   ["RC", "RC / Representante Comercial"],
+  ["FUNCIONARIO", "Funcionário BMC"],
   ["GESTOR", "Gestor"],
   ["ADMIN", "Administrador"],
 ] as const;

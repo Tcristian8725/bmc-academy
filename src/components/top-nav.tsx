@@ -7,6 +7,7 @@ const roleLabel: Record<string, string> = {
   GESTOR: "Gestor",
   TECNICO: "Técnico",
   RC: "Representante Comercial",
+  FUNCIONARIO: "Funcionário BMC",
 };
 
 export default function TopNav({

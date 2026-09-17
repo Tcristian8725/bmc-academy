@@ -6,6 +6,7 @@ import { users } from "@/db/schema";
 import { requireLoggedIn } from "@/lib/auth";
 import { getSession } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
+import { assignPublishedTrainingsToUser } from "@/lib/assignments";
 
 export interface CompleteProfileState {
   error?: string;
@@ -13,14 +14,16 @@ export interface CompleteProfileState {
 }
 
 // Mapa do tipo escolhido pela pessoa para o papel de acesso no sistema.
-// "Funcionário BMC" é mantido no mesmo nível de Técnico por segurança: o
-// autocadastro é público e sem aprovação de um admin, então nunca deve
-// conceder por conta própria acesso de Gestor/Administrador — isso é
-// definido depois, manualmente, em Admin > Usuários.
+// Os três tipos (Técnico, RC, Funcionário BMC) viram papéis de verdade,
+// distintos entre si — usados pra decidir quais treinamentos cada um recebe
+// automaticamente (ver src/lib/assignments.ts). Nenhum dos três dá acesso
+// de Gestor/Administrador por conta própria: o autocadastro é público e sem
+// aprovação de um admin, então elevar pra Gestor/Admin continua sendo feito
+// depois, manualmente, em Admin > Usuários.
 const TIPO_TO_ROLE = {
   TECNICO: "TECNICO",
   RC: "RC",
-  FUNCIONARIO_BMC: "TECNICO",
+  FUNCIONARIO_BMC: "FUNCIONARIO",
 } as const;
 
 const TIPO_TO_POSITION_LABEL = {
@@ -70,6 +73,11 @@ export async function completeProfileAction(
     .where(eq(users.id, session.userId!));
 
   await logAudit(session.userId!, "PROFILE_COMPLETED", { tipo, role });
+
+  // Pedido do Telles (rodada 14): quem entra já recebe todos os treinamentos
+  // publicados que já existem pro perfil escolhido, sem depender de
+  // atribuição manual do admin.
+  await assignPublishedTrainingsToUser(session.userId!, role);
 
   const updatedSession = await getSession();
   updatedSession.name = name;

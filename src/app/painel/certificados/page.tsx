@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { certificates, trainings } from "@/db/schema";
 
 export default async function CertificadosPage() {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
 
   const rows = await db
     .select({

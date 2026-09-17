@@ -15,7 +15,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function PainelPage() {
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   const assignments = await listAssignmentsForUser(session.userId!);
 
   const concluded = assignments.filter((a) => a.status === "CONCLUIDO").length;

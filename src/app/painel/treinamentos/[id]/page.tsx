@@ -10,7 +10,7 @@ export default async function TrainingPlayerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await requireUser(["TECNICO", "RC"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO"]);
   const data = await getTrainingForUser(id, session.userId!);
 
   if (!data) notFound();

@@ -1,0 +1,1 @@
+ALTER TABLE "trainings" ADD COLUMN "audience_roles" text DEFAULT 'TECNICO,RC' NOT NULL;
