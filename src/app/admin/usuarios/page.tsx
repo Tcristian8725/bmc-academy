@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -47,6 +48,7 @@ export default async function UsuariosPage() {
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Último acesso</th>
               <th className="px-4 py-3"></th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -93,6 +95,14 @@ export default async function UsuariosPage() {
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("pt-BR") : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/admin/usuarios/${u.id}`}
+                    className="text-xs font-medium text-brand hover:underline"
+                  >
+                    Ver perfil
+                  </Link>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
