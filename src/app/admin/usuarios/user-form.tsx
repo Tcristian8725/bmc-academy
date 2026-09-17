@@ -25,7 +25,7 @@ export default function UserForm({
       {open && (
         <form action={formAction} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Nome completo" name="name" required />
-          <Field label="E-mail (login)" name="email" type="email" required />
+          <Field label="E-mail (login)" name="email" type="text" required />
           <Field label="Senha provisória" name="password" type="password" required />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Perfil</label>
