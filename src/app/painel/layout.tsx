@@ -12,6 +12,7 @@ export default async function PainelLayout({ children }: { children: React.React
         links={[
           { href: "/painel", label: "Meus treinamentos" },
           { href: "/painel/certificados", label: "Meus certificados" },
+          { href: "/painel/perfil", label: "Meu perfil" },
         ]}
       />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">{children}</main>
