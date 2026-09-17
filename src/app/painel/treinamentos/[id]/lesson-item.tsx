@@ -53,6 +53,19 @@ function loadYouTubeIframeApi(): Promise<void> {
 // pelo menos 70% da duração total. Como a contagem é por tempo tocado (um
 // intervalo a cada segundo, só enquanto o player está em PLAYING), pular
 // posição não adianta nada — só o tempo real com o vídeo tocando conta.
+// mm:ss (ou h:mm:ss para vídeos com mais de uma hora) para o tempo do player
+// de controles próprios.
+function formatTime(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "0:00";
+  const s = Math.floor(totalSeconds);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  const mm = hours > 0 ? String(minutes).padStart(2, "0") : String(minutes);
+  const ss = String(seconds).padStart(2, "0");
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 function YouTubeGatedPlayer({
   embedUrl,
   title,
@@ -74,6 +87,14 @@ function YouTubeGatedPlayer({
   const playerRef = useRef<{
     getCurrentTime: () => number;
     getDuration: () => number;
+    playVideo: () => void;
+    pauseVideo: () => void;
+    seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+    setVolume: (volume: number) => void;
+    getVolume: () => number;
+    mute: () => void;
+    unMute: () => void;
+    isMuted: () => boolean;
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSentRef = useRef(initialWatchedPercent);
@@ -85,6 +106,17 @@ function YouTubeGatedPlayer({
   const lastTickAtRef = useRef<number | null>(null);
   const [watchedPercent, setWatchedPercent] = useState(initialWatchedPercent);
   const [completed, setCompleted] = useState(initialCompleted);
+
+  // Estado só da UI dos controles próprios (ver comentário em video.ts sobre
+  // por que `controls=0` — sem isso, some junto o play/pause/barra de
+  // progresso nativos do YouTube, então recriamos aqui).
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(100);
+  const [ready, setReady] = useState(false);
+  const seekingRef = useRef(false);
 
   useEffect(() => {
     let destroyed = false;
@@ -137,6 +169,13 @@ function YouTubeGatedPlayer({
             accumulatedSecondsRef.current + elapsed
           );
           send((accumulatedSecondsRef.current / duration) * 100);
+
+          // Atualiza a posição mostrada na barra de progresso própria
+          // (diferente do "tempo assistido" acima) — só quando a pessoa não
+          // está arrastando a barra manualmente, pra não brigar com o gesto.
+          if (!seekingRef.current) {
+            setCurrentTime(player.getCurrentTime());
+          }
         }, 1000);
       };
 
@@ -152,19 +191,31 @@ function YouTubeGatedPlayer({
         events: {
           onReady: (e: { target: typeof playerRef.current }) => {
             playerRef.current = e.target;
+            setReady(true);
+            const d = e.target?.getDuration?.();
+            if (d) setDuration(d);
+            const v = e.target?.getVolume?.();
+            if (typeof v === "number") setVolume(v);
+            setMuted(Boolean(e.target?.isMuted?.()));
           },
           onStateChange: (e: { data: number; target: typeof playerRef.current }) => {
             playerRef.current = e.target;
+            const d = e.target?.getDuration?.();
+            if (d) setDuration(d);
             // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
             if (e.data === 1) {
+              setIsPlaying(true);
               startPolling();
             } else {
+              setIsPlaying(false);
               stopPolling();
+              if (!seekingRef.current) {
+                setCurrentTime(e.target?.getCurrentTime?.() ?? 0);
+              }
               // O vídeo pode "terminar" (ENDED) sem ter sido de fato
               // assistido (ex.: a pessoa pulou direto pro final) — reporta
               // o acumulado real, sem forçar 100% automaticamente.
-              const duration = e.target?.getDuration?.();
-              if (duration) send((accumulatedSecondsRef.current / duration) * 100);
+              if (d) send((accumulatedSecondsRef.current / d) * 100);
             }
           },
         },
@@ -178,9 +229,59 @@ function YouTubeGatedPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function togglePlay() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (isPlaying) {
+      player.pauseVideo();
+    } else {
+      player.playVideo();
+    }
+  }
+
+  // `type="range"` dispara `onChange` só ao soltar — usamos `onInput` pra já
+  // mover visualmente a bolinha enquanto arrasta, e só chamamos `seekTo` (que
+  // afeta o vídeo de verdade) quando a pessoa solta o controle.
+  function handleSeekInput(e: React.FormEvent<HTMLInputElement>) {
+    seekingRef.current = true;
+    setCurrentTime(Number(e.currentTarget.value));
+  }
+
+  function handleSeekCommit(e: React.ChangeEvent<HTMLInputElement> | React.PointerEvent<HTMLInputElement>) {
+    const value = Number((e.target as HTMLInputElement).value);
+    playerRef.current?.seekTo(value, true);
+    seekingRef.current = false;
+  }
+
+  function toggleMute() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (muted) {
+      player.unMute();
+      setMuted(false);
+    } else {
+      player.mute();
+      setMuted(true);
+    }
+  }
+
+  function handleVolumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const next = Number(e.target.value);
+    setVolume(next);
+    playerRef.current?.setVolume(next);
+    if (next > 0 && muted) {
+      playerRef.current?.unMute();
+      setMuted(false);
+    }
+  }
+
   return (
     <div>
-      <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+      {/* Controles nativos do YouTube desligados (ver video.ts) pra tirar o
+          ícone de compartilhar/assistir depois e o botão "Assista no
+          YouTube" — os controles abaixo (play/pause, progresso, volume) são
+          próprios, feitos com a IFrame API do YouTube. */}
+      <div className="group relative aspect-video w-full overflow-hidden rounded-lg bg-black">
         <iframe
           id={iframeId.current}
           src={embedUrl}
@@ -189,6 +290,96 @@ function YouTubeGatedPlayer({
           allowFullScreen
           title={title}
         />
+
+        <button
+          type="button"
+          onClick={togglePlay}
+          disabled={!ready}
+          aria-label={isPlaying ? "Pausar vídeo" : "Reproduzir vídeo"}
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 transition hover:bg-black/10"
+        >
+          {!isPlaying && (
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-white">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </span>
+          )}
+        </button>
+
+        <div
+          className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-2 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2 pt-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={!ready}
+            aria-label={isPlaying ? "Pausar" : "Reproduzir"}
+            className="shrink-0 text-white"
+          >
+            {isPlaying ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+
+          <span className="shrink-0 text-[11px] tabular-nums text-white/80">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={0.5}
+            value={Math.min(currentTime, duration || 0)}
+            onInput={handleSeekInput}
+            onChange={handleSeekCommit}
+            disabled={!ready || !duration}
+            aria-label="Progresso do vídeo"
+            className="h-1 flex-1 accent-white"
+          />
+
+          <button
+            type="button"
+            onClick={toggleMute}
+            disabled={!ready}
+            aria-label={muted ? "Ativar som" : "Desativar som"}
+            className="shrink-0 text-white"
+          >
+            {muted || volume === 0 ? (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M18.36 5.64a9 9 0 0 1 0 12.73" />
+              </svg>
+            )}
+          </button>
+
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={muted ? 0 : volume}
+            onChange={handleVolumeChange}
+            disabled={!ready}
+            aria-label="Volume"
+            className="h-1 w-14 shrink-0 accent-white"
+          />
+        </div>
       </div>
       <div className="mt-2">
         <div className="flex items-center justify-between text-xs text-gray-500">

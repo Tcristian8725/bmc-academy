@@ -14,7 +14,8 @@
  */
 // `enablejsapi=1` é obrigatório para o player aceitar comandos/eventos via
 // postMessage (usado em lesson-item.tsx para medir quanto do vídeo foi
-// realmente assistido, em vez de confiar num botão manual "já assisti").
+// realmente assistido, em vez de confiar num botão manual "já assisti", e
+// também pra tocar/pausar/avançar via os controles próprios — ver abaixo).
 //
 // Os outros parâmetros (pedido do Telles: tirar as "chamadas" do YouTube de
 // cima do vídeo — cards de "mais vídeos", ícone de compartilhar, etc.):
@@ -24,6 +25,14 @@
 // - `iv_load_policy=3`: desliga anotações/cards do vídeo — é isso que fazia
 //   aparecer o balão "Mais vídeos" (sugestão de outro vídeo) por cima da
 //   gravação durante a reprodução.
+// - `controls=0`: desliga os controles nativos do YouTube por completo —
+//   é o único jeito de tirar também o ícone de compartilhar, o de "assistir
+//   depois" e o botão "Assista no YouTube", que vêm junto com a barra de
+//   controle nativa e não têm um parâmetro próprio pra serem escondidos
+//   individualmente. Como isso também tira o play/pause e a barra de
+//   progresso nativos, o `lesson-item.tsx` (única tela que usa este embed)
+//   constrói os próprios controles (play/pause, progresso, volume) usando a
+//   IFrame API do YouTube — ver `YouTubeGatedPlayer` lá.
 function withJsApi(embedUrl: string): string {
   try {
     const u = new URL(embedUrl);
@@ -31,6 +40,7 @@ function withJsApi(embedUrl: string): string {
     u.searchParams.set("rel", "0");
     u.searchParams.set("modestbranding", "1");
     u.searchParams.set("iv_load_policy", "3");
+    u.searchParams.set("controls", "0");
     return u.toString();
   } catch {
     return embedUrl;
