@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import {
@@ -12,6 +13,11 @@ import {
   answers,
   trainingAssignments,
   users,
+  progress,
+  examAttempts,
+  certificates,
+  lessonProgress,
+  learningPathCourses,
 } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
 import { formatAudienceRoles, syncTrainingAssignments } from "@/lib/assignments";
@@ -37,6 +43,57 @@ export async function togglePublishAction(trainingId: string, published: boolean
   }
   revalidatePath(`/admin/treinamentos/${trainingId}`);
   revalidatePath("/admin/treinamentos");
+}
+
+/** Exclui um treinamento por completo (pedido do Telles: retirar o
+ * treinamento de exemplo "Introdução à Operação Segura", que era só um
+ * seed de teste inicial, nunca um treinamento real). Remove em cascata tudo
+ * que depende dele — atribuições, progresso, lições, prova (questões,
+ * alternativas, tentativas) e certificados — já que não há FK cascade
+ * configurada no schema. Uso geral: serve para qualquer treinamento de
+ * teste/rascunho que o admin queira remover, não só este. */
+export async function deleteTrainingAction(trainingId: string) {
+  const session = await assertAdmin();
+
+  const [exam] = await db.select().from(exams).where(eq(exams.trainingId, trainingId));
+  const trainingLessons = await db
+    .select()
+    .from(lessons)
+    .where(eq(lessons.trainingId, trainingId));
+  const lessonIds = trainingLessons.map((l) => l.id);
+
+  // progress.lastLessonId referencia lessons.id — remove antes das lições.
+  await db.delete(progress).where(eq(progress.trainingId, trainingId));
+
+  if (exam) {
+    const examQuestions = await db.select().from(questions).where(eq(questions.examId, exam.id));
+    const questionIds = examQuestions.map((q) => q.id);
+
+    // certificates.examAttemptId referencia exam_attempts.id — remove antes.
+    await db.delete(certificates).where(eq(certificates.trainingId, trainingId));
+    await db.delete(examAttempts).where(eq(examAttempts.examId, exam.id));
+    if (questionIds.length > 0) {
+      await db.delete(answers).where(inArray(answers.questionId, questionIds));
+    }
+    await db.delete(questions).where(eq(questions.examId, exam.id));
+    await db.delete(exams).where(eq(exams.trainingId, trainingId));
+  } else {
+    // Sem prova, ainda pode haver certificado emitido sem tentativa vinculada.
+    await db.delete(certificates).where(eq(certificates.trainingId, trainingId));
+  }
+
+  if (lessonIds.length > 0) {
+    await db.delete(lessonProgress).where(inArray(lessonProgress.lessonId, lessonIds));
+  }
+  await db.delete(lessons).where(eq(lessons.trainingId, trainingId));
+  await db.delete(trainingAssignments).where(eq(trainingAssignments.trainingId, trainingId));
+  await db.delete(learningPathCourses).where(eq(learningPathCourses.trainingId, trainingId));
+  await db.delete(trainings).where(eq(trainings.id, trainingId));
+
+  await logAudit(session.userId!, "TRAINING_DELETED", { trainingId });
+
+  revalidatePath("/admin/treinamentos");
+  redirect("/admin/treinamentos");
 }
 
 export async function setAudienceAction(trainingId: string, formData: FormData) {

@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import {
   togglePublishAction,
+  deleteTrainingAction,
   setAudienceAction,
   addLessonAction,
   deleteLessonAction,
@@ -106,18 +107,31 @@ export default async function TrainingDetailPage({
           </h1>
           <p className="text-sm text-gray-500">{training.description}</p>
         </div>
-        <form action={togglePublishAction.bind(null, id, !training.published)}>
-          <button
-            type="submit"
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-              training.published
-                ? "border border-gray-300 text-gray-600 hover:bg-gray-50"
-                : "bg-brand text-white hover:bg-brand-dark"
-            }`}
-          >
-            {training.published ? "Despublicar" : "Publicar"}
-          </button>
-        </form>
+        <div className="flex shrink-0 items-center gap-2">
+          <form action={togglePublishAction.bind(null, id, !training.published)}>
+            <button
+              type="submit"
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+                training.published
+                  ? "border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  : "bg-brand text-white hover:bg-brand-dark"
+              }`}
+            >
+              {training.published ? "Despublicar" : "Publicar"}
+            </button>
+          </form>
+          {/* Exclui o treinamento por completo (lições, prova, atribuições,
+              progresso e certificados) — pensado pra retirar treinamentos de
+              teste/exemplo, como o seed inicial "Introdução à Operação Segura". */}
+          <form action={deleteTrainingAction.bind(null, id)}>
+            <button
+              type="submit"
+              className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+            >
+              Excluir treinamento
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Público-alvo: quem recebe este treinamento automaticamente */}
