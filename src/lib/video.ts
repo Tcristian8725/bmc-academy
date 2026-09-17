@@ -15,10 +15,22 @@
 // `enablejsapi=1` é obrigatório para o player aceitar comandos/eventos via
 // postMessage (usado em lesson-item.tsx para medir quanto do vídeo foi
 // realmente assistido, em vez de confiar num botão manual "já assisti").
+//
+// Os outros parâmetros (pedido do Telles: tirar as "chamadas" do YouTube de
+// cima do vídeo — cards de "mais vídeos", ícone de compartilhar, etc.):
+// - `rel=0`: ao pausar/terminar, só sugere vídeos do mesmo canal (não
+//   qualquer vídeo do YouTube).
+// - `modestbranding=1`: reduz a marca do YouTube na barra de controle.
+// - `iv_load_policy=3`: desliga anotações/cards do vídeo — é isso que fazia
+//   aparecer o balão "Mais vídeos" (sugestão de outro vídeo) por cima da
+//   gravação durante a reprodução.
 function withJsApi(embedUrl: string): string {
   try {
     const u = new URL(embedUrl);
     u.searchParams.set("enablejsapi", "1");
+    u.searchParams.set("rel", "0");
+    u.searchParams.set("modestbranding", "1");
+    u.searchParams.set("iv_load_policy", "3");
     return u.toString();
   } catch {
     return embedUrl;
