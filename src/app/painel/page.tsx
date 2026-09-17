@@ -28,75 +28,99 @@ export default async function PainelPage() {
   const continueItem = assignments.find((a) => a.status === "EM_ANDAMENTO");
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">
-          Olá, {session.name!.split(" ")[0]}. Bem-vindo à BMC Academy.
-        </h1>
-        <p className="text-sm text-gray-500">
-          Acompanhe seus treinamentos, provas e certificados por aqui.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Atribuídos" value={assignments.length} />
-        <StatCard label="Concluídos" value={concluded} />
-        <StatCard label="Pendentes" value={pending} />
-        <StatCard label="Progresso geral" value={`${overallPercent}%`} />
-      </div>
-
-      {continueItem && (
-        <Link
-          href={`/painel/treinamentos/${continueItem.trainingId}`}
-          className="flex items-center justify-between rounded-xl bg-brand px-5 py-4 text-white shadow-sm transition hover:bg-brand-dark"
-        >
-          <div>
-            <p className="text-xs uppercase tracking-wide text-white/70">Continuar treinamento</p>
-            <p className="font-semibold">{continueItem.title}</p>
-          </div>
-          <span className="text-sm font-medium">Continuar →</span>
-        </Link>
-      )}
-
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-foreground">Meus treinamentos</h2>
-        <div className="divide-y divide-gray-100 rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-          {assignments.length === 0 && (
-            <p className="p-6 text-sm text-gray-500">
-              Nenhum treinamento atribuído ainda.
-            </p>
-          )}
-          {assignments.map((a) => (
-            <Link
-              key={a.assignmentId}
-              href={`/painel/treinamentos/${a.trainingId}`}
-              className="flex items-center justify-between gap-4 p-4 hover:bg-gray-50"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{a.title}</p>
-                <p className="text-xs text-gray-500">
-                  {a.required ? "Obrigatório" : "Opcional"}
-                  {a.workloadHours ? ` • ${a.workloadHours}h` : ""}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="hidden w-28 sm:block">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-brand"
-                      style={{ width: `${a.percentComplete}%` }}
-                    />
-                  </div>
-                </div>
-                <span
-                  className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColor[a.status]}`}
-                >
-                  {statusLabel[a.status]}
-                </span>
-              </div>
-            </Link>
-          ))}
+    <div className="grid gap-8 xl:grid-cols-[1fr_300px]">
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Olá, {session.name!.split(" ")[0]}. Bem-vindo à BMC Academy.
+          </h1>
+          <p className="text-sm text-gray-500">
+            Acompanhe seus treinamentos, provas e certificados por aqui.
+          </p>
         </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard label="Atribuídos" value={assignments.length} />
+          <StatCard label="Concluídos" value={concluded} />
+          <StatCard label="Pendentes" value={pending} />
+          <StatCard label="Progresso geral" value={`${overallPercent}%`} />
+        </div>
+
+        {continueItem && (
+          <Link
+            href={`/painel/treinamentos/${continueItem.trainingId}`}
+            className="flex items-center justify-between rounded-xl bg-brand px-5 py-4 text-white shadow-sm transition hover:bg-brand-dark"
+          >
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/70">Continuar treinamento</p>
+              <p className="font-semibold">{continueItem.title}</p>
+            </div>
+            <span className="text-sm font-medium">Continuar →</span>
+          </Link>
+        )}
+
+        <div>
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Meus treinamentos</h2>
+          <div className="divide-y divide-gray-100 rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+            {assignments.length === 0 && (
+              <p className="p-6 text-sm text-gray-500">
+                Nenhum treinamento atribuído ainda.
+              </p>
+            )}
+            {assignments.map((a) => (
+              <Link
+                key={a.assignmentId}
+                href={`/painel/treinamentos/${a.trainingId}`}
+                className="flex items-center justify-between gap-4 p-4 hover:bg-gray-50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{a.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {a.required ? "Obrigatório" : "Opcional"}
+                    {a.workloadHours ? ` • ${a.workloadHours}h` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="hidden w-28 sm:block">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-brand"
+                        style={{ width: `${a.percentComplete}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span
+                    className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColor[a.status]}`}
+                  >
+                    {statusLabel[a.status]}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <TvPanel />
+    </div>
+  );
+}
+
+function TvPanel() {
+  return (
+    <div className="xl:sticky xl:top-8 xl:self-start">
+      <div className="overflow-hidden rounded-2xl bg-gray-900 p-2 shadow-sm ring-1 ring-black/5">
+        <video
+          className="aspect-video w-full rounded-xl object-cover"
+          src="/branding/tv-maquinas-hyundai.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+        <p className="px-1 pb-1 pt-2 text-center text-[11px] font-medium uppercase tracking-wide text-white/60">
+          Linha Amarela Hyundai
+        </p>
       </div>
     </div>
   );
