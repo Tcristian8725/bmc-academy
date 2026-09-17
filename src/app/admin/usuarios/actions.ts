@@ -93,3 +93,39 @@ export async function toggleUserActiveAction(userId: string, active: boolean) {
   await logAudit(session.userId!, active ? "USER_REACTIVATED" : "USER_DEACTIVATED", { userId });
   revalidatePath("/admin/usuarios");
 }
+
+export interface UpdateProfileState {
+  error?: string;
+  success?: boolean;
+}
+
+/** Edita os dados de cadastro de um usuário (CPF, CNPJ, telefone, etc.) —
+ * usado pelo admin em Admin > Usuários > Ver perfil, por exemplo para
+ * completar os dados de um técnico com o que já existe em outro sistema
+ * (ex.: SAB), sem precisar que a pessoa passe pelo autocadastro. */
+export async function updateUserProfileAction(
+  userId: string,
+  _prev: UpdateProfileState,
+  formData: FormData
+): Promise<UpdateProfileState> {
+  const session = await requireUser(["ADMIN"]);
+
+  const cpf = String(formData.get("cpf") || "").trim() || null;
+  const cnpj = String(formData.get("cnpj") || "").trim() || null;
+  const registrationNumber = String(formData.get("registrationNumber") || "").trim() || null;
+  const phone = String(formData.get("phone") || "").trim() || null;
+  const whatsapp = String(formData.get("whatsapp") || "").trim() || null;
+  const position = String(formData.get("position") || "").trim() || null;
+  const department = String(formData.get("department") || "").trim() || null;
+  const address = String(formData.get("address") || "").trim() || null;
+
+  await db
+    .update(users)
+    .set({ cpf, cnpj, registrationNumber, phone, whatsapp, position, department, address })
+    .where(eq(users.id, userId));
+
+  await logAudit(session.userId!, "USER_PROFILE_UPDATED", { userId });
+
+  revalidatePath(`/admin/usuarios/${userId}`);
+  return { success: true };
+}

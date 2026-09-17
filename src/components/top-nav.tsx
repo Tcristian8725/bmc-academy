@@ -14,11 +14,30 @@ export default function TopNav({
   name,
   role,
   links,
+  profileHref,
 }: {
   name: string;
   role: string;
   links: { href: string; label: string }[];
+  /** Quando definido, o nome/perfil no canto superior direito vira um link
+   *  para a tela de perfil da própria pessoa (ex.: "/painel/perfil"). */
+  profileHref?: string;
 }) {
+  const nameBlock = profileHref ? (
+    <Link
+      href={profileHref}
+      className="text-right transition hover:opacity-70"
+      title="Ver meu perfil"
+    >
+      <p className="text-sm font-medium text-foreground">{name}</p>
+      <p className="text-xs text-gray-500">{roleLabel[role] ?? role} · Meu perfil</p>
+    </Link>
+  ) : (
+    <div className="text-right">
+      <p className="text-sm font-medium text-foreground">{name}</p>
+      <p className="text-xs text-gray-500">{roleLabel[role] ?? role}</p>
+    </div>
+  );
   return (
     <header className="sticky top-0 z-10 border-b border-black/5 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
@@ -45,10 +64,7 @@ export default function TopNav({
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-medium text-foreground">{name}</p>
-            <p className="text-xs text-gray-500">{roleLabel[role] ?? role}</p>
-          </div>
+          {nameBlock}
           <Link
             href="/senha"
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"

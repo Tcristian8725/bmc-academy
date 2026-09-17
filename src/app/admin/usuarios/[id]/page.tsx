@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users, branches, certificates, trainings } from "@/db/schema";
 import { listAssignmentsForUser } from "@/lib/training-flow";
+import EditProfileForm from "./edit-profile-form";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
@@ -110,6 +111,20 @@ export default async function PerfilUsuarioPage({
             }
           />
         </dl>
+
+        <EditProfileForm
+          userId={user.id}
+          initial={{
+            cpf: user.cpf,
+            cnpj: user.cnpj,
+            registrationNumber: user.registrationNumber,
+            phone: user.phone,
+            whatsapp: user.whatsapp,
+            position: user.position,
+            department: user.department,
+            address: user.address,
+          }}
+        />
       </div>
 
       {/* Habilidades / treinamentos */}
