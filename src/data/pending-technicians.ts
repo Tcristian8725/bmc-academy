@@ -30,4 +30,11 @@ export const PENDING_TECHNICIANS: PendingTechnician[] = [
     tempPassword: "680380",
     role: "TECNICO",
   },
+  {
+    // Pedido do Telles (rodada 33): criar login para Vera Oliveira, perfil RC.
+    name: "Vera Oliveira",
+    login: "vera.oliveira@bmchyundai.com.br",
+    tempPassword: "640252",
+    role: "RC",
+  },
 ];
