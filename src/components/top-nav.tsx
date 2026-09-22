@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/logout";
+import NotificationBell, { type NotificationItem } from "@/components/notification-bell";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
@@ -15,6 +16,7 @@ export default function TopNav({
   role,
   links,
   profileHref,
+  notifications,
 }: {
   name: string;
   role: string;
@@ -22,6 +24,10 @@ export default function TopNav({
   /** Quando definido, o nome/perfil no canto superior direito vira um link
    *  para a tela de perfil da própria pessoa (ex.: "/painel/perfil"). */
   profileHref?: string;
+  /** Quando definido, mostra o sininho de notificações (ex.: "Novo
+   *  treinamento disponível") — só passado pelo painel do técnico/RC/
+   *  funcionário por enquanto (ver src/app/painel/layout.tsx). */
+  notifications?: NotificationItem[];
 }) {
   const nameBlock = profileHref ? (
     <Link
@@ -64,6 +70,7 @@ export default function TopNav({
           </nav>
         </div>
         <div className="flex items-center gap-3">
+          {notifications !== undefined && <NotificationBell notifications={notifications} />}
           {nameBlock}
           <Link
             href="/senha"

@@ -19,6 +19,7 @@
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { trainings, trainingAssignments, users } from "@/db/schema";
+import { notifyTrainingAssigned } from "./training-notifications";
 
 export const AUDIENCE_ROLES = ["TECNICO", "RC", "FUNCIONARIO"] as const;
 export type AudienceRole = (typeof AUDIENCE_ROLES)[number];
@@ -69,6 +70,11 @@ export async function syncTrainingAssignments(trainingId: string): Promise<numbe
       required: true,
     });
     assignedCount++;
+    // Pedido do Telles (rodada 31): quem passa a ter o treinamento novo
+    // recebe e-mail + notificação na plataforma. Este é o ponto que cobre
+    // "colocar um treinamento novo" (publicar / mudar público-alvo) para
+    // gente que já tinha conta — ver training-notifications.ts.
+    await notifyTrainingAssigned(u.id, trainingId);
   }
   return assignedCount;
 }
@@ -98,6 +104,12 @@ export async function assignPublishedTrainingsToUser(
     .where(eq(trainingAssignments.userId, userId));
   const alreadyAssignedTrainingIds = new Set(existingAssignments.map((a) => a.trainingId));
 
+  // De propósito, SEM notifyTrainingAssigned aqui: isso rodaria pra cada
+  // treinamento já publicado de uma vez (conta nova / troca de papel),
+  // disparando uma enxurrada de e-mails só por causa do provisionamento
+  // inicial — o pedido do Telles era sobre avisar quando um treinamento
+  // NOVO é colocado, não sobre o catálogo inteiro que a pessoa já ganha ao
+  // entrar (ver notifyTrainingAssigned em training-notifications.ts).
   let assignedCount = 0;
   for (const t of matching) {
     if (alreadyAssignedTrainingIds.has(t.id)) continue;

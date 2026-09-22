@@ -21,6 +21,7 @@ import {
 } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
 import { formatAudienceRoles, syncTrainingAssignments } from "@/lib/assignments";
+import { notifyTrainingAssigned } from "@/lib/training-notifications";
 
 async function assertAdmin() {
   return requireUser(["ADMIN"]);
@@ -255,6 +256,9 @@ export async function assignUserAction(trainingId: string, formData: FormData) {
     .values({ trainingId, userId, required, assignedBy: session.userId! });
 
   await logAudit(session.userId!, "TRAINING_ASSIGNED", { trainingId, userId });
+  // Atribuição manual de um treinamento existente a uma pessoa específica —
+  // mesmo aviso de "novo treinamento disponível" (e-mail + notificação).
+  await notifyTrainingAssigned(userId, trainingId);
   revalidatePath(`/admin/treinamentos/${trainingId}`);
 }
 

@@ -291,6 +291,25 @@ export const notificationLogs = pgTable("notification_logs", {
     .notNull(),
 });
 
+// Notificações dentro da própria plataforma (rodada 31 — pedido do Telles:
+// "quando a gente colocar um treinamento novo, chegue um e-mail ou uma
+// notificação para o técnico"). Cada linha é um aviso mostrado no sininho de
+// notificações do usuário (ex.: "Novo treinamento disponível"), além do
+// e-mail equivalente já registrado em notification_logs — ver
+// src/lib/training-notifications.ts.
+export const userNotifications = pgTable("user_notifications", {
+  id: id(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // ex.: /painel/treinamentos/{id} — pra onde clicar leva
+  relatedTrainingId: text("related_training_id"),
+  read: boolean("read").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+    .default(sql`now()`)
+    .notNull(),
+});
+
 // --- Auditoria -------------------------------------------------------
 
 export const auditLogs = pgTable("audit_logs", {
