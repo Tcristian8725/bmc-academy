@@ -22,6 +22,7 @@ import {
 import { logAudit } from "@/lib/audit";
 import { formatAudienceRoles, syncTrainingAssignments } from "@/lib/assignments";
 import { notifyTrainingAssigned } from "@/lib/training-notifications";
+import { TRAINING_CATEGORY_VALUES } from "@/lib/categories";
 
 async function assertAdmin() {
   return requireUser(["ADMIN"]);
@@ -110,6 +111,24 @@ export async function setAudienceAction(trainingId: string, formData: FormData) 
     await syncTrainingAssignments(trainingId);
   }
   revalidatePath(`/admin/treinamentos/${trainingId}`);
+}
+
+/** Corrige a categoria de um treinamento já criado (pedido do Telles,
+ * rodada 32) — antes só dava pra escolher a categoria na criação. Precisa
+ * disso pra poder recategorizar um treinamento pra dentro do tema certo
+ * (ex.: Elétrica, Hidráulica) na hora de organizar as trilhas. */
+export async function setCategoryAction(trainingId: string, formData: FormData) {
+  const session = await assertAdmin();
+  const category = String(formData.get("category") || "");
+  if (!(TRAINING_CATEGORY_VALUES as readonly string[]).includes(category)) return;
+
+  await db
+    .update(trainings)
+    .set({ category: category as (typeof TRAINING_CATEGORY_VALUES)[number] })
+    .where(eq(trainings.id, trainingId));
+  await logAudit(session.userId!, "TRAINING_CATEGORY_UPDATED", { trainingId, category });
+  revalidatePath(`/admin/treinamentos/${trainingId}`);
+  revalidatePath("/admin/treinamentos");
 }
 
 export async function addLessonAction(trainingId: string, formData: FormData) {

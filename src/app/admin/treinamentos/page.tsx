@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { trainings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { trainingCategoryLabel } from "@/lib/categories";
 
 export default async function TreinamentosPage() {
   await requireUser(["ADMIN"]);
@@ -38,7 +39,7 @@ export default async function TreinamentosPage() {
               <p className="font-medium text-foreground">
                 {t.code} — {t.title}
               </p>
-              <p className="text-xs text-gray-500">{t.category}</p>
+              <p className="text-xs text-gray-500">{trainingCategoryLabel(t.category)}</p>
             </div>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-medium ${

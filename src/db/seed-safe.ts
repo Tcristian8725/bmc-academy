@@ -7,7 +7,7 @@
  * Dados 100% fictícios, mesmos do seed.ts — servem apenas para demonstrar o
  * fluxo ponta a ponta descrito na seção 30 do Prompt Mestre.
  */
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db } from "./index";
 import {
   branches,
@@ -48,6 +48,78 @@ export async function ensureRealAdmin(email: string): Promise<string> {
   });
 
   return `Login real de admin criado — e-mail: ${email} / senha: ${password} (guarde esta senha agora, ela não será mostrada de novo).`;
+}
+
+/**
+ * Corrige a categoria das 8 provas reais de Entrega Técnica (rodada 32) —
+ * foram importadas com a categoria genérica "TECNICO" (import-real-exams.ts,
+ * decisão da época em que a categoria "Entrega Técnica" ainda não existia).
+ * O próprio código (`ENTREGA-...`) já identifica quem são. Só corrige quem
+ * ainda estiver como "TECNICO" — nunca sobrescreve uma categoria que um
+ * admin já tenha mudado manualmente depois (ex.: via Admin > Treinamentos >
+ * Categoria). Idempotente: rodar de novo não faz nada se já estiver certo.
+ */
+export async function recategorizeEntregaTecnica(): Promise<string> {
+  const entregaTrainings = await db.select().from(trainings).where(like(trainings.code, "ENTREGA-%"));
+
+  let updated = 0;
+  for (const t of entregaTrainings) {
+    if (t.category === "TECNICO") {
+      await db.update(trainings).set({ category: "ENTREGA_TECNICA" }).where(eq(trainings.id, t.id));
+      updated++;
+    }
+  }
+  return `Recategorização Entrega Técnica: ${updated} treinamento(s) corrigido(s) de "Técnico" para "Entrega Técnica" (${entregaTrainings.length} no total).`;
+}
+
+/**
+ * Garante a trilha de conhecimento "Entrega Técnica" com as 8 provas reais
+ * dentro dela (rodada 32) — exemplo concreto do pedido do Telles. Cria a
+ * trilha se ainda não existir, e só ADICIONA treinamentos que ainda não
+ * estão nela (nunca remove nada que um admin tenha tirado de propósito).
+ * As trilhas "Elétrica"/"Hidráulica" citadas por ele não são criadas aqui —
+ * não há ainda treinamento real dessas categorias; o admin cria em Admin >
+ * Trilhas quando houver conteúdo pra colocar dentro.
+ */
+export async function ensureEntregaTecnicaLearningPath(): Promise<string> {
+  const [existingPath] = await db
+    .select()
+    .from(learningPaths)
+    .where(eq(learningPaths.name, "Entrega Técnica"));
+
+  const path =
+    existingPath ??
+    (
+      await db
+        .insert(learningPaths)
+        .values({
+          name: "Entrega Técnica",
+          description: "Treinamentos de entrega técnica de cada equipamento.",
+        })
+        .returning()
+    )[0];
+
+  const entregaTrainings = await db.select().from(trainings).where(like(trainings.code, "ENTREGA-%"));
+  const currentCourses = await db
+    .select()
+    .from(learningPathCourses)
+    .where(eq(learningPathCourses.learningPathId, path.id));
+  const alreadyIn = new Set(currentCourses.map((c) => c.trainingId));
+
+  let order = currentCourses.length;
+  let added = 0;
+  for (const t of entregaTrainings) {
+    if (alreadyIn.has(t.id)) continue;
+    order++;
+    await db.insert(learningPathCourses).values({
+      learningPathId: path.id,
+      trainingId: t.id,
+      order,
+      requiresPreviousCompleted: false,
+    });
+    added++;
+  }
+  return `Trilha "Entrega Técnica": ${added} treinamento(s) adicionado(s) (total agora: ${currentCourses.length + added}).`;
 }
 
 export async function seedIfEmpty(): Promise<string> {

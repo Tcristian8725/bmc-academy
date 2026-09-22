@@ -7,6 +7,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { TRAINING_CATEGORY_VALUES } from "@/lib/categories";
 
 // ---------------------------------------------------------------------------
 // BMC ACADEMY — schema do banco de dados (protótipo)
@@ -93,22 +94,7 @@ export const trainings = pgTable("trainings", {
   code: text("code").notNull().unique(),
   title: text("title").notNull(),
   description: text("description"),
-  category: text("category", {
-    enum: [
-      "PRODUTO",
-      "TECNICO",
-      "MANUTENCAO",
-      "DIAGNOSTICO",
-      "HIDRAULICA",
-      "ELETRICA",
-      "MOTOR",
-      "OPERACAO",
-      "APLICACAO",
-      "SEGURANCA",
-      "COMERCIAL",
-      "POS_VENDAS",
-    ],
-  }).notNull(),
+  category: text("category", { enum: TRAINING_CATEGORY_VALUES }).notNull(),
   targetAudience: text("target_audience"), // público-alvo (texto livre, exibido pra pessoa)
   // Público-alvo de verdade, usado pra decidir quem recebe o treinamento
   // automaticamente (seção "Nova trava" / rodada 14): lista separada por

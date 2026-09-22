@@ -15,6 +15,7 @@ import {
   togglePublishAction,
   deleteTrainingAction,
   setAudienceAction,
+  setCategoryAction,
   addLessonAction,
   deleteLessonAction,
   createExamAction,
@@ -26,6 +27,7 @@ import {
   unassignUserAction,
 } from "./actions";
 import { parseAudienceRoles } from "@/lib/assignments";
+import { TRAINING_CATEGORIES } from "@/lib/categories";
 
 const AUDIENCE_OPTIONS = [
   ["TECNICO", "Técnico"],
@@ -133,6 +135,35 @@ export default async function TrainingDetailPage({
           </form>
         </div>
       </div>
+
+      {/* Categoria: usada pra filtrar/organizar e pra decidir em quais
+          trilhas de conhecimento (Admin > Trilhas) este treinamento pode
+          entrar — ver rodada 32. */}
+      <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
+        <h2 className="text-sm font-semibold text-foreground">Categoria</h2>
+        <form
+          action={setCategoryAction.bind(null, training.id)}
+          className="mt-3 flex flex-wrap items-center gap-3"
+        >
+          <select
+            name="category"
+            defaultValue={training.category}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            {TRAINING_CATEGORIES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Salvar categoria
+          </button>
+        </form>
+      </section>
 
       {/* Público-alvo: quem recebe este treinamento automaticamente */}
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">

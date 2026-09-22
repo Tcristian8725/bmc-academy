@@ -2,23 +2,9 @@
 
 import { useActionState } from "react";
 import { createTrainingAction, type TrainingFormState } from "../actions";
+import { TRAINING_CATEGORIES } from "@/lib/categories";
 
 const initialState: TrainingFormState = {};
-
-const CATEGORIES = [
-  ["PRODUTO", "Produto"],
-  ["TECNICO", "Técnico"],
-  ["MANUTENCAO", "Manutenção"],
-  ["DIAGNOSTICO", "Diagnóstico"],
-  ["HIDRAULICA", "Hidráulica"],
-  ["ELETRICA", "Elétrica"],
-  ["MOTOR", "Motor"],
-  ["OPERACAO", "Operação"],
-  ["APLICACAO", "Aplicação"],
-  ["SEGURANCA", "Segurança"],
-  ["COMERCIAL", "Comercial"],
-  ["POS_VENDAS", "Pós-vendas"],
-] as const;
 
 export default function NewTrainingForm() {
   const [state, formAction, pending] = useActionState(createTrainingAction, initialState);
@@ -60,7 +46,7 @@ export default function NewTrainingForm() {
             name="category"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
-            {CATEGORIES.map(([value, label]) => (
+            {TRAINING_CATEGORIES.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>

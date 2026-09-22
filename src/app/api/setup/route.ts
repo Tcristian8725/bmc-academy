@@ -18,7 +18,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db } from "@/db";
-import { ensureRealAdmin, seedIfEmpty } from "@/db/seed-safe";
+import {
+  ensureRealAdmin,
+  seedIfEmpty,
+  recategorizeEntregaTecnica,
+  ensureEntregaTecnicaLearningPath,
+} from "@/db/seed-safe";
 import { importRealExams } from "@/db/import-real-exams";
 import { syncAllPublishedTrainingAssignments } from "@/lib/assignments";
 
@@ -60,6 +65,12 @@ export async function GET(req: NextRequest) {
     // rotina existir (rodada 14).
     const syncMsg = await syncAllPublishedTrainingAssignments();
     log.push(syncMsg);
+
+    const recatMsg = await recategorizeEntregaTecnica();
+    log.push(recatMsg);
+
+    const trilhaMsg = await ensureEntregaTecnicaLearningPath();
+    log.push(trilhaMsg);
 
     log.push("Configuração concluída com sucesso.");
     return NextResponse.json({ ok: true, log });

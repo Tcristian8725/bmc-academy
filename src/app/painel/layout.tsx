@@ -13,6 +13,7 @@ export default async function PainelLayout({ children }: { children: React.React
         role={session.role!}
         links={[
           { href: "/painel", label: "Meus treinamentos" },
+          { href: "/painel/trilhas", label: "Trilhas de conhecimento" },
           { href: "/painel/certificados", label: "Meus certificados" },
         ]}
         profileHref="/painel/perfil"

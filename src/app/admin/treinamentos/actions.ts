@@ -6,25 +6,11 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { trainings } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
+import { TRAINING_CATEGORY_VALUES } from "@/lib/categories";
 
 export interface TrainingFormState {
   error?: string;
 }
-
-const CATEGORIES = [
-  "PRODUTO",
-  "TECNICO",
-  "MANUTENCAO",
-  "DIAGNOSTICO",
-  "HIDRAULICA",
-  "ELETRICA",
-  "MOTOR",
-  "OPERACAO",
-  "APLICACAO",
-  "SEGURANCA",
-  "COMERCIAL",
-  "POS_VENDAS",
-] as const;
 
 export async function createTrainingAction(
   _prev: TrainingFormState,
@@ -42,7 +28,7 @@ export async function createTrainingAction(
   if (!code || !title) {
     return { error: "Informe código e título do treinamento." };
   }
-  if (!CATEGORIES.includes(category as (typeof CATEGORIES)[number])) {
+  if (!TRAINING_CATEGORY_VALUES.includes(category as (typeof TRAINING_CATEGORY_VALUES)[number])) {
     return { error: "Categoria inválida." };
   }
 
@@ -54,7 +40,7 @@ export async function createTrainingAction(
         code,
         title,
         description,
-        category: category as (typeof CATEGORIES)[number],
+        category: category as (typeof TRAINING_CATEGORY_VALUES)[number],
         workloadHours,
         instructor,
         published: false,
