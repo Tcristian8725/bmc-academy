@@ -115,7 +115,9 @@ export default async function MeuPerfilPage() {
                   <p className="text-xs text-gray-500">
                     {a.required ? "Obrigatório" : "Opcional"}
                     {cert
-                      ? `• Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(cert.issuedAt)}`
+                      ? ` • Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(
+                                                  cert.issuedAt
+                                                )}`
                       : ""}
                   </p>
                 </div>
