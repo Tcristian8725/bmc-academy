@@ -14,7 +14,6 @@ import {
 import {
   togglePublishAction,
   deleteTrainingAction,
-  setAudienceAction,
   setCategoryAction,
   addLessonAction,
   deleteLessonAction,
@@ -28,6 +27,7 @@ import {
 } from "./actions";
 import { parseAudienceRoles } from "@/lib/assignments";
 import { TRAINING_CATEGORIES } from "@/lib/categories";
+import { AudienceForm } from "./audience-form";
 
 const AUDIENCE_OPTIONS = [
   ["TECNICO", "Técnico"],
@@ -173,26 +173,11 @@ export default async function TrainingDetailPage({
           ativo de um dos perfis marcados abaixo. Marcar um perfil novo aqui já atribui na hora,
           sem precisar despublicar/republicar.
         </p>
-        <form action={setAudienceAction.bind(null, training.id)} className="mt-3 flex flex-wrap items-center gap-4">
-          {AUDIENCE_OPTIONS.map(([v, l]) => (
-            <label key={v} className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                name="audienceRole"
-                value={v}
-                defaultChecked={currentAudience.includes(v)}
-                className="accent-[--color-brand]"
-              />
-              {l}
-            </label>
-          ))}
-          <button
-            type="submit"
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-          >
-            Salvar público-alvo
-          </button>
-        </form>
+        <AudienceForm
+                    trainingId={training.id}
+                    options={AUDIENCE_OPTIONS}
+                    currentAudience={currentAudience}
+                  />
       </section>
 
       {/* Conteúdo / Lições */}
