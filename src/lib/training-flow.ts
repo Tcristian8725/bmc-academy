@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { formatDateBR } from "@/lib/datetime";
 import {
   trainingAssignments,
   trainings,
@@ -460,7 +461,7 @@ export async function issueCertificateForTraining(
   const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
 
   const now = new Date();
-  const completedAtLabel = now.toLocaleDateString("pt-BR");
+  const completedAtLabel = formatDateBR(now);
 
   // marca progresso como concluído
   await db
