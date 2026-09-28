@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users, branches, certificates, trainings } from "@/db/schema";
 import { listAssignmentsForUser } from "@/lib/training-flow";
+import { formatDateBR, formatDateTimeBR } from "@/lib/datetime";
 import EditProfileForm from "./edit-profile-form";
 
 const roleLabel: Record<string, string> = {
@@ -102,13 +103,11 @@ export default async function PerfilUsuarioPage({
           <Field label="Endereço" value={user.address} />
           <Field
             label="Cadastro"
-            value={user.createdAt ? new Date(user.createdAt).toLocaleDateString("pt-BR") : null}
+                        value={user.createdAt ? formatDateBR(user.createdAt) : null}
           />
           <Field
             label="Último acesso"
-            value={
-              user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("pt-BR") : "Nunca acessou"
-            }
+            value={user.lastLoginAt ? formatDateTimeBR(user.lastLoginAt) : "Nunca acessou"}
           />
         </dl>
 
@@ -152,9 +151,7 @@ export default async function PerfilUsuarioPage({
                   <p className="text-xs text-gray-500">
                     {a.required ? "Obrigatório" : "Opcional"}
                     {cert
-                      ? ` • Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${new Date(
-                          cert.issuedAt
-                        ).toLocaleDateString("pt-BR")}`
+                      ? `• Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(cert.issuedAt)}`
                       : ""}
                   </p>
                 </div>
