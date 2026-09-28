@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { certificates, trainings, users } from "@/db/schema";
+import { formatDateBR } from "@/lib/datetime";
 
 export default async function ValidateCertificatePage({
   params,
@@ -63,7 +64,7 @@ export default async function ValidateCertificatePage({
               )}
               <p>
                 <span className="text-gray-500">Emitido em:</span>{" "}
-                {new Date(row.issuedAt).toLocaleDateString("pt-BR")}
+                {formatDateBR(row.issuedAt)}
               </p>
               <p>
                 <span className="text-gray-500">Código:</span>{" "}
