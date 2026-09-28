@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { formatDateTimeBR } from "@/lib/datetime";
 import UserForm from "./user-form";
 import { toggleUserActiveAction, updateUserRoleAction } from "./actions";
 
@@ -94,7 +95,7 @@ export default async function UsuariosPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500">
-                  {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("pt-BR") : "—"}
+                  {u.lastLoginAt ? formatDateTimeBR(u.lastLoginAt) : "—"}
                 </td>
                 <td className="px-4 py-3">
                   <Link
