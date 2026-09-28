@@ -98,19 +98,33 @@ export async function deleteTrainingAction(trainingId: string) {
   redirect("/admin/treinamentos");
 }
 
-export async function setAudienceAction(trainingId: string, formData: FormData) {
-  const session = await assertAdmin();
-  const roles = formData.getAll("audienceRole") as string[];
-  const audienceRoles = formatAudienceRoles(roles);
+// Estado devolvido pro formulário cliente (ver audience-form.tsx) — pedido
+// do Telles (rodada 36): o botão "Salvar público-alvo" já salvava certinho
+// no banco, mas sem nenhum retorno visual (sem toast, sem "salvo!"), então
+// parecia que não tinha feito nada ao clicar. `savedAt` muda a cada
+// salvamento bem-sucedido, o que a tela usa pra mostrar uma confirmação.
+export interface SetAudienceState {
+    savedAt: number | null;
+}
 
-  await db.update(trainings).set({ audienceRoles }).where(eq(trainings.id, trainingId));
-  await logAudit(session.userId!, "TRAINING_AUDIENCE_UPDATED", { trainingId, audienceRoles });
+export async function setAudienceAction(
+    trainingId: string,
+    _prevState: SetAudienceState,
+    formData: FormData
+  ): Promise<SetAudienceState> {
+    const session = await assertAdmin();
+    const roles = formData.getAll("audienceRole") as string[];
+    const audienceRoles = formatAudienceRoles(roles);
 
-  const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
-  if (training?.published) {
-    await syncTrainingAssignments(trainingId);
-  }
-  revalidatePath(`/admin/treinamentos/${trainingId}`);
+    await db.update(trainings).set({ audienceRoles }).where(eq(trainings.id, trainingId));
+    await logAudit(session.userId!, "TRAINING_AUDIENCE_UPDATED", { trainingId, audienceRoles });
+
+    const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
+    if (training?.published) {
+          await syncTrainingAssignments(trainingId);
+    }
+    revalidatePath(`/admin/treinamentos/${trainingId}`);
+    return { savedAt: Date.now() };
 }
 
 /** Corrige a categoria de um treinamento já criado (pedido do Telles,
