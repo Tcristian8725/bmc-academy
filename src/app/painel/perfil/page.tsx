@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users, branches, certificates, trainings } from "@/db/schema";
 import { listAssignmentsForUser } from "@/lib/training-flow";
+import { formatDateBR } from "@/lib/datetime";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
@@ -81,7 +82,7 @@ export default async function MeuPerfilPage() {
           <Field label="Endereço" value={user.address} />
           <Field
             label="Cadastro"
-            value={user.createdAt ? new Date(user.createdAt).toLocaleDateString("pt-BR") : null}
+                        value={user.createdAt ? formatDateBR(user.createdAt) : null}
           />
         </dl>
         <p className="mt-4 text-xs text-gray-400">
@@ -114,9 +115,7 @@ export default async function MeuPerfilPage() {
                   <p className="text-xs text-gray-500">
                     {a.required ? "Obrigatório" : "Opcional"}
                     {cert
-                      ? ` • Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${new Date(
-                          cert.issuedAt
-                        ).toLocaleDateString("pt-BR")}`
+                      ? `• Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(cert.issuedAt)}`
                       : ""}
                   </p>
                 </div>
