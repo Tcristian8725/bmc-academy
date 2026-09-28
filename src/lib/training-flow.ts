@@ -291,19 +291,42 @@ export async function allLessonsCompleted(userId: string, trainingId: string): P
 // Provas
 // ---------------------------------------------------------------------------
 
+// Embaralha um array sem alterar o original (Fisher-Yates). Usado para
+// sortear a ordem das perguntas e das alternativas a cada vez que alguém
+// abre a prova — pedido do Telles (rodada 35): o feedback foi que a
+// resposta certa sempre caía na mesma posição (ex.: sempre a letra D),
+// dando pra "colar" pela posição sem saber o conteúdo. A correção da prova
+// (ver submitExamAttempt/correctByQuestion abaixo) compara por ID da
+// alternativa, nunca por posição, então embaralhar aqui é seguro.
+function shuffle<T>(items: T[]): T[] {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
+
 export async function getExamPlayerData(examId: string, userId: string) {
   const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
   if (!exam) return null;
 
-  const examQuestions = await db
+  const examQuestionsOrdered = await db
     .select()
     .from(questions)
     .where(eq(questions.examId, examId))
     .orderBy(questions.order);
 
+    // Sorteio novo a cada chamada (ou seja, a cada vez que a pessoa abre a
+    // prova, inclusive numa nova tentativa) — nunca um embaralhamento salvo.
+    const examQuestions = exam.shuffleQuestions
+      ? shuffle(examQuestionsOrdered)
+          : examQuestionsOrdered;
+
   const questionsWithAnswers = [];
   for (const q of examQuestions) {
-    const qAnswers = await db.select().from(answers).where(eq(answers.questionId, q.id));
+    const qAnswersOrdered = await db.select().from(answers).where(eq(answers.questionId, q.id));
+        const qAnswers = exam.shuffleAnswers ? shuffle(qAnswersOrdered) : qAnswersOrdered;
     questionsWithAnswers.push({
       ...q,
       answers: qAnswers.map((a) => ({ id: a.id, text: a.text })), // sem expor "correct"
