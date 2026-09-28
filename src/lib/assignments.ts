@@ -25,84 +25,97 @@ export const AUDIENCE_ROLES = ["TECNICO", "RC", "FUNCIONARIO"] as const;
 export type AudienceRole = (typeof AUDIENCE_ROLES)[number];
 
 export function parseAudienceRoles(value: string | null | undefined): AudienceRole[] {
-  return (value || "")
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter((s): s is AudienceRole => (AUDIENCE_ROLES as readonly string[]).includes(s));
+    return (value || "")
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter((s): s is AudienceRole => (AUDIENCE_ROLES as readonly string[]).includes(s));
 }
 
 export function formatAudienceRoles(roles: string[]): string {
-  const valid = roles
-    .map((r) => r.trim().toUpperCase())
-    .filter((s) => (AUDIENCE_ROLES as readonly string[]).includes(s));
-  // Nunca deixa vazio — sem público-alvo, o treinamento nunca seria atribuído
+    const valid = roles
+      .map((r) => r.trim().toUpperCase())
+      .filter((s) => (AUDIENCE_ROLES as readonly string[]).includes(s));
+    // Nunca deixa vazio — sem público-alvo, o treinamento nunca seria atribuído
   // a ninguém automaticamente, o que quase certamente não é a intenção.
   return valid.length > 0 ? valid.join(",") : "TECNICO,RC";
 }
 
 /** Garante que todo usuário ativo cujo papel bate com o público-alvo do
  * treinamento tenha uma atribuição (obrigatória). Retorna quantas foram
- * criadas agora. */
+ * criadas agora.
+ *
+ * Funcionário BMC é um caso especial (pedido do Telles, rodada 35): "todos
+ * os treinamentos serão atribuídos ao usuário funcionário BMC" — esse papel
+ * recebe TODO treinamento publicado, sempre, independente do público-alvo
+ * configurado no treinamento (o checkbox "Funcionário BMC" na tela de
+ * público-alvo continua existindo, mas não tem mais efeito nesse papel). */
 export async function syncTrainingAssignments(trainingId: string): Promise<number> {
-  const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
-  if (!training) return 0;
+    const [training] = await db.select().from(trainings).where(eq(trainings.id, trainingId));
+    if (!training) return 0;
 
   const audience = parseAudienceRoles(training.audienceRoles);
-  if (audience.length === 0) return 0;
+    const rolesToAssign = Array.from(new Set<AudienceRole>([...audience, "FUNCIONARIO"]));
 
   const targetUsers = await db
-    .select()
-    .from(users)
-    .where(and(inArray(users.role, audience), eq(users.active, true)));
+      .select()
+      .from(users)
+      .where(and(inArray(users.role, rolesToAssign), eq(users.active, true)));
 
   const existingAssignments = await db
-    .select()
-    .from(trainingAssignments)
-    .where(eq(trainingAssignments.trainingId, trainingId));
-  const alreadyAssignedUserIds = new Set(existingAssignments.map((a) => a.userId));
+      .select()
+      .from(trainingAssignments)
+      .where(eq(trainingAssignments.trainingId, trainingId));
+    const alreadyAssignedUserIds = new Set(existingAssignments.map((a) => a.userId));
 
   let assignedCount = 0;
-  for (const u of targetUsers) {
-    if (alreadyAssignedUserIds.has(u.id)) continue;
-    await db.insert(trainingAssignments).values({
-      trainingId,
-      userId: u.id,
-      required: true,
-    });
-    assignedCount++;
-    // Pedido do Telles (rodada 31): quem passa a ter o treinamento novo
-    // recebe e-mail + notificação na plataforma. Este é o ponto que cobre
-    // "colocar um treinamento novo" (publicar / mudar público-alvo) para
-    // gente que já tinha conta — ver training-notifications.ts.
-    await notifyTrainingAssigned(u.id, trainingId);
-  }
+    for (const u of targetUsers) {
+          if (alreadyAssignedUserIds.has(u.id)) continue;
+          await db.insert(trainingAssignments).values({
+                  trainingId,
+                  userId: u.id,
+                  required: true,
+          });
+          assignedCount++;
+          // Pedido do Telles (rodada 31): quem passa a ter o treinamento novo
+      // recebe e-mail + notificação na plataforma. Este é o ponto que cobre
+      // "colocar um treinamento novo" (publicar / mudar público-alvo) para
+      // gente que já tinha conta — ver training-notifications.ts.
+      await notifyTrainingAssigned(u.id, trainingId);
+                                              }
   return assignedCount;
 }
 
 /** Garante que o usuário receba todos os treinamentos já publicados cujo
- * público-alvo bate com o papel dele. Retorna quantos foram criados agora. */
+ * público-alvo bate com o papel dele. Retorna quantos foram criados agora.
+ *
+ * Funcionário BMC recebe TODO treinamento publicado, sempre — não passa
+ * pelo filtro de público-alvo (pedido do Telles, rodada 35; ver
+ * syncTrainingAssignments acima para a mesma regra do outro lado). */
 export async function assignPublishedTrainingsToUser(
-  userId: string,
-  role: string
-): Promise<number> {
-  if (!(AUDIENCE_ROLES as readonly string[]).includes(role)) return 0;
-  const audienceRole = role as AudienceRole;
+    userId: string,
+    role: string
+  ): Promise<number> {
+    if (!(AUDIENCE_ROLES as readonly string[]).includes(role)) return 0;
+    const audienceRole = role as AudienceRole;
 
   const publishedTrainings = await db
-    .select()
-    .from(trainings)
-    .where(eq(trainings.published, true));
+      .select()
+      .from(trainings)
+      .where(eq(trainings.published, true));
 
-  const matching = publishedTrainings.filter((t) =>
-    parseAudienceRoles(t.audienceRoles).includes(audienceRole)
-  );
-  if (matching.length === 0) return 0;
+  const matching =
+        audienceRole === "FUNCIONARIO"
+        ? publishedTrainings
+          : publishedTrainings.filter((t) =>
+                      parseAudienceRoles(t.audienceRoles).includes(audienceRole)
+                                              );
+    if (matching.length === 0) return 0;
 
   const existingAssignments = await db
-    .select()
-    .from(trainingAssignments)
-    .where(eq(trainingAssignments.userId, userId));
-  const alreadyAssignedTrainingIds = new Set(existingAssignments.map((a) => a.trainingId));
+      .select()
+      .from(trainingAssignments)
+      .where(eq(trainingAssignments.userId, userId));
+    const alreadyAssignedTrainingIds = new Set(existingAssignments.map((a) => a.trainingId));
 
   // De propósito, SEM notifyTrainingAssigned aqui: isso rodaria pra cada
   // treinamento já publicado de uma vez (conta nova / troca de papel),
@@ -111,16 +124,16 @@ export async function assignPublishedTrainingsToUser(
   // NOVO é colocado, não sobre o catálogo inteiro que a pessoa já ganha ao
   // entrar (ver notifyTrainingAssigned em training-notifications.ts).
   let assignedCount = 0;
-  for (const t of matching) {
-    if (alreadyAssignedTrainingIds.has(t.id)) continue;
-    await db.insert(trainingAssignments).values({
-      trainingId: t.id,
-      userId,
-      required: true,
-    });
-    assignedCount++;
-  }
-  return assignedCount;
+    for (const t of matching) {
+          if (alreadyAssignedTrainingIds.has(t.id)) continue;
+          await db.insert(trainingAssignments).values({
+                  trainingId: t.id,
+                  userId,
+                  required: true,
+          });
+          assignedCount++;
+    }
+    return assignedCount;
 }
 
 /** Rotina de manutenção (chamada pelo /api/setup): garante que todo mundo já
@@ -128,14 +141,14 @@ export async function assignPublishedTrainingsToUser(
  * criadas antes desta funcionalidade existir (ex.: alguém criado depois de um
  * treinamento já ter sido publicado, que nunca recebeu a atribuição). */
 export async function syncAllPublishedTrainingAssignments(): Promise<string> {
-  const publishedTrainings = await db
-    .select()
-    .from(trainings)
-    .where(eq(trainings.published, true));
+    const publishedTrainings = await db
+      .select()
+      .from(trainings)
+      .where(eq(trainings.published, true));
 
   let total = 0;
-  for (const t of publishedTrainings) {
-    total += await syncTrainingAssignments(t.id);
-  }
-  return `Sincronização de atribuições: ${total} nova(s) atribuição(ões) criada(s) em ${publishedTrainings.length} treinamento(s) publicado(s).`;
+    for (const t of publishedTrainings) {
+          total += await syncTrainingAssignments(t.id);
+    }
+    return `Sincronização de atribuições: ${total} nova(s) atribuição(ões) criada(s) em ${publishedTrainings.length} treinamento(s) publicado(s).`;
 }
