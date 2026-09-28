@@ -103,7 +103,7 @@ export default async function PerfilUsuarioPage({
           <Field label="Endereço" value={user.address} />
           <Field
             label="Cadastro"
-                        value={user.createdAt ? formatDateBR(user.createdAt) : null}
+            value={user.createdAt ? formatDateBR(user.createdAt) : null}
           />
           <Field
             label="Último acesso"
@@ -151,8 +151,10 @@ export default async function PerfilUsuarioPage({
                   <p className="text-xs text-gray-500">
                     {a.required ? "Obrigatório" : "Opcional"}
                     {cert
-                      ? `• Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(cert.issuedAt)}`
-                      : ""}
+                      ? ` • Nota ${cert.scorePercent?.toFixed(0)}% • Certificado emitido em ${formatDateBR(
+                            cert.issuedAt
+                          )}`
+                    : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
