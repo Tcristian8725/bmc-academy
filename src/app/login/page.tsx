@@ -41,10 +41,6 @@ export default function LoginPage() {
             Ainda não tenho conta
           </Link>
         </p>
-
-        <p className="mt-4 text-center text-xs text-gray-200 drop-shadow">
-          Protótipo interno de validação — dados de teste.
-        </p>
       </div>
     </div>
   );
