@@ -22,19 +22,70 @@ const ROLE_OPTIONS = [
   ["ADMIN", "Administrador"],
 ] as const;
 
-export default async function UsuariosPage() {
+// Abas de filtro rápido no topo da lista — mesma ordem usada no resto do
+// admin. "Todos" (sem filtro) sempre vem primeiro.
+const ROLE_TABS = [
+  ["TECNICO", "Técnicos"],
+  ["RC", "RCs"],
+  ["FUNCIONARIO", "Funcionários BMC"],
+  ["GESTOR", "Gestores"],
+  ["ADMIN", "Administradores"],
+] as const;
+
+export default async function UsuariosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string }>;
+}) {
   const session = await requireUser(["ADMIN"]);
+  const { role: roleFilter } = await searchParams;
 
   const allUsers = await db.select().from(users);
   const managers = allUsers.filter((u) => u.role === "GESTOR" || u.role === "ADMIN");
 
+  const validFilter = roleFilter && roleLabel[roleFilter] ? roleFilter : undefined;
+  const visibleUsers = validFilter ? allUsers.filter((u) => u.role === validFilter) : allUsers;
+
+  const countByRole = (role: string) => allUsers.filter((u) => u.role === role).length;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Usuários</h1>
+        <h1 className="text-2xl font-semibold text-foreground">
+          Usuários
+          {validFilter && <span className="text-gray-400"> — {roleLabel[validFilter]}</span>}
+        </h1>
         <p className="text-sm text-gray-500">
-          Cadastro, edição e desativação de usuários (seção 2 do Prompt Mestre).
+          {validFilter
+            ? `${visibleUsers.length} ${visibleUsers.length === 1 ? "pessoa" : "pessoas"} com perfil ${roleLabel[validFilter]}.`
+            : "Cadastro, edição e desativação de usuários (seção 2 do Prompt Mestre)."}
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/usuarios"
+          className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            !validFilter
+              ? "bg-brand text-white"
+              : "bg-white text-gray-600 ring-1 ring-black/5 hover:bg-gray-50"
+          }`}
+        >
+          Todos ({allUsers.length})
+        </Link>
+        {ROLE_TABS.map(([value, label]) => (
+          <Link
+            key={value}
+            href={`/admin/usuarios?role=${value}`}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              validFilter === value
+                ? "bg-brand text-white"
+                : "bg-white text-gray-600 ring-1 ring-black/5 hover:bg-gray-50"
+            }`}
+          >
+            {label} ({countByRole(value)})
+          </Link>
+        ))}
       </div>
 
       <UserForm managers={managers.map((m) => ({ id: m.id, name: m.name }))} />
@@ -53,7 +104,14 @@ export default async function UsuariosPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {allUsers.map((u) => (
+            {visibleUsers.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                  Nenhum usuário encontrado{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}.
+                </td>
+              </tr>
+            )}
+            {visibleUsers.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
