@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { pool } from "@/db";
 import { requireUser } from "@/lib/auth";
 
@@ -42,32 +43,48 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Usuários" value={totalUsers} />
-        <Stat label="Técnicos" value={tecnicoRows[0].c} />
-        <Stat label="RCs" value={rcRows[0].c} />
-        <Stat label="Treinamentos" value={totalTrainings} />
-        <Stat label="Em andamento" value={byStatus.EM_ANDAMENTO} />
-        <Stat label="Concluídos" value={byStatus.CONCLUIDO} />
-        <Stat label="Certificados emitidos" value={totalCertificates} />
+        <Stat label="Usuários" value={totalUsers} href="/admin/usuarios" />
+        <Stat label="Técnicos" value={tecnicoRows[0].c} href="/admin/usuarios?role=TECNICO" />
+        <Stat label="RCs" value={rcRows[0].c} href="/admin/usuarios?role=RC" />
+        <Stat label="Treinamentos" value={totalTrainings} href="/admin/treinamentos" />
+        <Stat
+          label="Em andamento"
+          value={byStatus.EM_ANDAMENTO}
+          href="/admin/progresso?status=EM_ANDAMENTO"
+        />
+        <Stat
+          label="Concluídos"
+          value={byStatus.CONCLUIDO}
+          href="/admin/progresso?status=CONCLUIDO"
+        />
+        <Stat
+          label="Certificados emitidos"
+          value={totalCertificates}
+          href="/admin/certificados"
+        />
         <Stat
           label="Média de notas"
           value={attemptsRow.avg ? `${attemptsRow.avg.toFixed(0)}%` : "—"}
+          href="/admin/provas"
         />
       </div>
 
       <p className="text-xs text-gray-400">
-        Filtros por período, filial, gestor, equipamento etc. (seção 15 do Prompt Mestre) ficam
-        para uma próxima fase — este dashboard cobre o essencial do MVP.
+        Clique em qualquer número acima para ver a lista detalhada. Filtros por período, filial,
+        gestor, equipamento etc. (seção 15 do Prompt Mestre) ficam para uma próxima fase.
       </p>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value, href }: { label: string; value: string | number; href: string }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+    <Link
+      href={href}
+      className="group block rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md hover:ring-brand/30"
+    >
       <p className="text-2xl font-semibold text-brand">{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
-    </div>
+      <p className="text-xs text-gray-500 group-hover:text-brand">{label}</p>
+    </Link>
   );
 }
