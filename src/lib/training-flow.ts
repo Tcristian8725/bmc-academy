@@ -173,14 +173,31 @@ async function recalcTrainingProgress(userId: string, trainingId: string, lastLe
     current = created;
   }
 
+  // Treinamentos sem prova nenhuma (ex.: trilha "Vídeos de Diagnóstico",
+  // rodada 38 — vídeos curtos de consulta técnica, sem avaliação nem
+  // certificado) nunca passam por submitExamAttempt/issueCertificateForTraining,
+  // que é o único lugar que hoje marca `status = CONCLUIDO`. Sem este trecho,
+  // um treinamento sem prova ficaria travado em "Em andamento" pra sempre
+  // assim que a primeira lição fosse concluída, mesmo com 100% das lições
+  // assistidas. Aqui: se o treinamento não tem prova e todas as lições já
+  // foram concluídas, já marcamos como concluído direto — sem emitir
+  // certificado nenhum (não faz sentido ter certificado sem avaliação).
+  const [exam] = await db.select().from(exams).where(eq(exams.trainingId, trainingId));
+  const allLessonsDoneNoExam =
+    !exam && trainingLessons.length > 0 && completedCount === trainingLessons.length;
+  const nextStatus: "EM_ANDAMENTO" | "CONCLUIDO" =
+    current.status === "CONCLUIDO" || allLessonsDoneNoExam ? "CONCLUIDO" : "EM_ANDAMENTO";
+  const justCompletedNoExam = nextStatus === "CONCLUIDO" && current.status !== "CONCLUIDO";
+
   await db
     .update(progressTable)
     .set({
-      status: current.status === "CONCLUIDO" ? "CONCLUIDO" : "EM_ANDAMENTO",
+      status: nextStatus,
       startedAt: current.startedAt ?? now,
       lastAccessAt: now,
       lastLessonId: lastLessonId ?? current.lastLessonId,
-      percentComplete: current.status === "CONCLUIDO" ? 100 : percent,
+      percentComplete: nextStatus === "CONCLUIDO" ? 100 : percent,
+      completedAt: justCompletedNoExam ? now : current.completedAt,
       updatedAt: now,
     })
     .where(and(eq(progressTable.trainingId, trainingId), eq(progressTable.userId, userId)));
