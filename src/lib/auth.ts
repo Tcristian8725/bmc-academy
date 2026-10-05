@@ -74,6 +74,21 @@ export async function requireUser(allowedRoles?: UserRole[]) {
   if (session.profileCompleted === false) {
     redirect("/cadastro");
   }
+  // Aprovação de cadastro (rodada 40): só quem está APROVADO entra nas áreas
+  // protegidas. Consulta o banco a cada página (e não o cookie) para que a
+  // decisão do admin valha na hora. Administradores nunca ficam bloqueados.
+  if (session.role !== "ADMIN") {
+    const [row] = await db
+      .select({ approvalStatus: users.approvalStatus })
+      .from(users)
+      .where(eq(users.id, session.userId));
+    if (!row) {
+      redirect("/login");
+    }
+    if (row.approvalStatus !== "APROVADO") {
+      redirect("/aguardando-aprovacao");
+    }
+  }
   if (allowedRoles && !allowedRoles.includes(session.role as UserRole)) {
     redirect("/painel");
   }
