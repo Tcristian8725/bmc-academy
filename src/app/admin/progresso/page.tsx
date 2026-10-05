@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { progress as progressTable, users, trainings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatDateTimeBR } from "@/lib/datetime";
+import { getDiagnosticTrainingIds } from "@/lib/diagnostic-ids";
 
 const statusLabel: Record<string, string> = {
   NAO_INICIADO: "Não iniciado",
@@ -28,6 +29,7 @@ export default async function ProgressoPage({
   const { status: statusFilter } = await searchParams;
   const validFilter = statusFilter && VALID_STATUS.has(statusFilter) ? statusFilter : undefined;
 
+  const diagnosticIds = Array.from(await getDiagnosticTrainingIds());
   const rows = await db
     .select({
       userName: users.name,
@@ -41,7 +43,12 @@ export default async function ProgressoPage({
     })
     .from(progressTable)
     .innerJoin(users, eq(progressTable.userId, users.id))
-    .innerJoin(trainings, eq(progressTable.trainingId, trainings.id));
+    .innerJoin(trainings, eq(progressTable.trainingId, trainings.id))
+    .where(
+      diagnosticIds.length > 0
+        ? and(isNull(users.deletedAt), notInArray(progressTable.trainingId, diagnosticIds))
+        : isNull(users.deletedAt)
+    );
 
   const countByStatus = (status: string) => rows.filter((r) => r.status === status).length;
   const visibleRows = validFilter ? rows.filter((r) => r.status === validFilter) : rows;
