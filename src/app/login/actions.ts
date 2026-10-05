@@ -28,8 +28,5 @@ export async function loginAction(
   if (session.role === "ADMIN") {
     redirect("/admin");
   }
-  if (session.role === "GESTOR") {
-    redirect("/gestor");
-  }
   redirect("/painel");
 }
