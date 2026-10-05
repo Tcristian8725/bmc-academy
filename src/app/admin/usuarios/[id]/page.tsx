@@ -9,11 +9,10 @@ import { formatDateBR, formatDateTimeBR } from "@/lib/datetime";
 import EditProfileForm from "./edit-profile-form";
 import { APPROVAL_LABEL, type ApprovalStatus } from "@/lib/approval";
 import { regionOfUf } from "@/lib/regions";
-import { deleteUserAction } from "../actions";
+import { deleteUserAction, restoreUserAction } from "../actions";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
-  GESTOR: "Gestor",
   TECNICO: "Técnico",
   RC: "Representante Comercial",
   FUNCIONARIO: "Funcionário BMC",
@@ -79,16 +78,38 @@ export default async function PerfilUsuarioPage({
         </p>
       </div>
 
+      {user.deletedAt && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">
+            Este usuário foi excluído em {formatDateTimeBR(user.deletedAt)}. Ele não consegue
+            entrar e não aparece nas listas, mas todo o histórico está guardado. Ao restaurar,
+            ele continua de onde parou.
+          </p>
+          <form action={restoreUserAction.bind(null, user.id)}>
+            <button
+              type="submit"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Restaurar usuário
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Dados pessoais */}
       <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-black/5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Dados</h2>
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              user.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+              user.deletedAt
+                ? "bg-red-100 text-red-700"
+                : user.active
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-gray-100 text-gray-500"
             }`}
           >
-            {user.active ? "Ativo" : "Inativo"}
+            {user.deletedAt ? "Excluído" : user.active ? "Ativo" : "Inativo"}
           </span>
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -193,27 +214,27 @@ export default async function PerfilUsuarioPage({
       </div>
 
       {/* Excluir usuário (rodada 41) */}
-      {user.id !== session.userId && (
+      {user.id !== session.userId && !user.deletedAt && (
         <details className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
           <summary className="cursor-pointer text-sm font-semibold text-red-600">
             Excluir este usuário
           </summary>
           <form action={deleteUserAction.bind(null, user.id)} className="mt-3 space-y-3">
             <p className="text-sm text-gray-600">
-              Isso apaga <strong>{user.name}</strong> de vez, com o progresso, as provas, os
-              certificados e as notificações dele. Não dá para desfazer. Se você só quer
-              bloquear o acesso e manter o histórico, use &quot;Desativar&quot; na lista de
-              usuários.
+              <strong>{user.name}</strong> perde o acesso e some das listas e dos números do
+              painel, mas todo o histórico (progresso, provas, certificados) fica guardado.
+              Dá para restaurar depois em Usuários &gt; Excluídos, e ele continua de onde
+              parou.
             </p>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" name="confirm" value="yes" required />
-              Entendo que a exclusão é permanente.
+              Confirmo que quero excluir este usuário.
             </label>
             <button
               type="submit"
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
             >
-              Excluir usuário definitivamente
+              Excluir usuário
             </button>
           </form>
         </details>
