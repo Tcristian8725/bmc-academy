@@ -59,7 +59,15 @@ export async function syncTrainingAssignments(trainingId: string): Promise<numbe
   const targetUsers = await db
       .select()
       .from(users)
-      .where(and(inArray(users.role, rolesToAssign), eq(users.active, true)));
+      .where(
+        and(
+          inArray(users.role, rolesToAssign),
+          eq(users.active, true),
+          // Rodada 40: quem ainda não foi aprovado não recebe treinamento
+          // (nem e-mail de "novo treinamento"); recebe ao ser aprovado.
+          eq(users.approvalStatus, "APROVADO")
+        )
+      );
 
   const existingAssignments = await db
       .select()
