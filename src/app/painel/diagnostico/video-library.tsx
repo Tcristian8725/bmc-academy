@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { isYouTubeEmbed } from "@/lib/video";
+import FreePlayer from "./free-player";
 
 export interface LibraryVideo {
   id: string;
@@ -45,15 +47,20 @@ export default function VideoLibrary({ videos }: { videos: LibraryVideo[] }) {
           return (
             <div key={v.id} className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
               {open ? (
-                <div className="aspect-video w-full bg-black">
-                  <iframe
-                    src={v.embedUrl}
-                    title={v.title}
-                    className="h-full w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                  />
-                </div>
+                isYouTubeEmbed(v.embedUrl) ? (
+                  // YouTube: player com controles próprios (sem o logo que leva ao YouTube).
+                  <FreePlayer embedUrl={v.embedUrl} title={v.title} playerId={`diag-player-${v.id}`} />
+                ) : (
+                  <div className="aspect-video w-full bg-black">
+                    <iframe
+                      src={v.embedUrl}
+                      title={v.title}
+                      className="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
+                    />
+                  </div>
+                )
               ) : (
                 <button
                   type="button"
