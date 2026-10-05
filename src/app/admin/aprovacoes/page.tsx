@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -10,11 +10,10 @@ const ROLE_LABEL: Record<string, string> = {
   TECNICO: "Técnico",
   RC: "Representante Comercial",
   FUNCIONARIO: "Funcionário BMC",
-  GESTOR: "Gestor",
   ADMIN: "Administrador",
 };
 
-/** Tela exclusiva do gestor para decidir os cadastros novos (rodada 41):
+/** Tela exclusiva dos administradores para decidir os cadastros novos (rodada 41):
  * lista só quem já concluiu o cadastro e aguarda decisão. */
 export default async function AprovacoesPage() {
   await requireUser(["ADMIN"]);
@@ -22,20 +21,32 @@ export default async function AprovacoesPage() {
   const waiting = await db
     .select()
     .from(users)
-    .where(and(eq(users.approvalStatus, "PENDENTE"), eq(users.profileCompleted, true)))
+    .where(
+      and(
+        eq(users.approvalStatus, "PENDENTE"),
+        eq(users.profileCompleted, true),
+        isNull(users.deletedAt)
+      )
+    )
     .orderBy(asc(users.createdAt));
 
   const notFinished = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.approvalStatus, "PENDENTE"), eq(users.profileCompleted, false)));
+    .where(
+      and(
+        eq(users.approvalStatus, "PENDENTE"),
+        eq(users.profileCompleted, false),
+        isNull(users.deletedAt)
+      )
+    );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Aprovações de cadastro</h1>
         <p className="text-sm text-gray-500">
-          Novos cadastros aguardando a decisão do gestor. Ao aprovar, a pessoa entra na
+          Novos cadastros aguardando a decisão dos administradores. Ao aprovar, a pessoa entra na
           plataforma e recebe os treinamentos do perfil dela; ela é avisada por e-mail.
         </p>
         {notFinished.length > 0 && (
@@ -117,7 +128,7 @@ export default async function AprovacoesPage() {
               >
                 <label className="flex items-center gap-2 text-xs text-gray-600">
                   <input type="checkbox" name="confirm" value="yes" required />
-                  Excluir de vez (não dá para desfazer)
+                  Excluir (fica arquivado; dá para restaurar depois)
                 </label>
                 <button
                   type="submit"
