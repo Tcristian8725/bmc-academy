@@ -150,18 +150,6 @@ export async function seedIfEmpty(): Promise<string> {
     })
     .returning();
 
-  const [gestor] = await db
-    .insert(users)
-    .values({
-      name: "Gestor Exemplo (teste)",
-      email: "gestor@teste.bmcacademy.local",
-      passwordHash: hash("gestor123"),
-      role: "GESTOR",
-      position: "Gestor de equipe (exemplo)",
-      branchId: matriz.id,
-    })
-    .returning();
-
   const [tecnico] = await db
     .insert(users)
     .values({
@@ -170,7 +158,6 @@ export async function seedIfEmpty(): Promise<string> {
       passwordHash: hash("tecnico123"),
       role: "TECNICO",
       position: "Técnico de campo",
-      managerId: gestor.id,
       branchId: matriz.id,
     })
     .returning();
@@ -183,7 +170,6 @@ export async function seedIfEmpty(): Promise<string> {
       passwordHash: hash("rc123456"),
       role: "RC",
       position: "Representante Comercial (exemplo)",
-      managerId: gestor.id,
       branchId: matriz.id,
     })
     .returning();
@@ -334,5 +320,5 @@ export async function seedIfEmpty(): Promise<string> {
     { userId: rc.id, trainingId: training.id, required: true, assignedBy: admin.id },
   ]);
 
-  return "Seed criado: 4 usuários fictícios (admin/gestor/técnico/RC de teste) + 1 treinamento de exemplo.";
+  return "Seed criado: 3 usuários fictícios (admin/técnico/RC de teste) + 1 treinamento de exemplo.";
 }
