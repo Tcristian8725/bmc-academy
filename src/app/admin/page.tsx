@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pool } from "@/db";
 import { requireUser } from "@/lib/auth";
+import { DIAGNOSTIC_TRAINING_IDS_SQL } from "@/lib/diagnostic-ids";
 
 async function count(table: string): Promise<number> {
   const { rows } = await pool.query(`SELECT COUNT(*)::int as c FROM ${table}`);
@@ -10,29 +11,41 @@ async function count(table: string): Promise<number> {
 export default async function AdminDashboard() {
   await requireUser(["ADMIN"]);
 
-  const totalUsers = await count("users");
+  const { rows: totalUserRows } = await pool.query(
+    `SELECT COUNT(*)::int as c FROM users WHERE deleted_at IS NULL`
+  );
+  const totalUsers: number = totalUserRows[0].c;
   const { rows: tecnicoRows } = await pool.query(
-    `SELECT COUNT(*)::int as c FROM users WHERE role = 'TECNICO'`
+    `SELECT COUNT(*)::int as c FROM users WHERE role = 'TECNICO' AND deleted_at IS NULL`
   );
   const { rows: rcRows } = await pool.query(
-    `SELECT COUNT(*)::int as c FROM users WHERE role = 'RC'`
+    `SELECT COUNT(*)::int as c FROM users WHERE role = 'RC' AND deleted_at IS NULL`
   );
   const { rows: pendingRows } = await pool.query(
-    `SELECT COUNT(*)::int as c FROM users WHERE approval_status = 'PENDENTE'`
+    `SELECT COUNT(*)::int as c FROM users WHERE approval_status = 'PENDENTE' AND deleted_at IS NULL`
   );
   const pendingSignups: number = pendingRows[0].c;
   const totalTrainings = await count("trainings");
-  const totalCertificates = await count("certificates");
+  const { rows: certRows } = await pool.query(
+    `SELECT COUNT(*)::int as c FROM certificates c
+     JOIN users u ON u.id = c.user_id WHERE u.deleted_at IS NULL`
+  );
+  const totalCertificates: number = certRows[0].c;
 
   const { rows: progressStats } = await pool.query<{ status: string; c: number }>(
-    `SELECT status, COUNT(*)::int as c FROM progress GROUP BY status`
+    `SELECT p.status, COUNT(*)::int as c FROM progress p
+     JOIN users u ON u.id = p.user_id
+     WHERE u.deleted_at IS NULL
+       AND p.training_id NOT IN ${DIAGNOSTIC_TRAINING_IDS_SQL}
+     GROUP BY p.status`
   );
 
   const byStatus: Record<string, number> = { NAO_INICIADO: 0, EM_ANDAMENTO: 0, CONCLUIDO: 0 };
   for (const row of progressStats) byStatus[row.status] = row.c;
 
   const { rows: attemptsRows } = await pool.query<{ avg: string | null; total: number }>(
-    `SELECT AVG(score_percent) as avg, COUNT(*)::int as total FROM exam_attempts`
+    `SELECT AVG(a.score_percent) as avg, COUNT(*)::int as total FROM exam_attempts a
+     JOIN users u ON u.id = a.user_id WHERE u.deleted_at IS NULL`
   );
   const attemptsRow = {
     avg: attemptsRows[0]?.avg ? Number(attemptsRows[0].avg) : null,
