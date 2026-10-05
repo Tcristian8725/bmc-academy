@@ -5,11 +5,7 @@ import { createUserAction, type UserFormState } from "./actions";
 
 const initialState: UserFormState = {};
 
-export default function UserForm({
-  managers,
-}: {
-  managers: { id: string; name: string }[];
-}) {
+export default function UserForm() {
   const [state, formAction, pending] = useActionState(createUserAction, initialState);
   const [open, setOpen] = useState(false);
 
@@ -36,28 +32,10 @@ export default function UserForm({
               <option value="TECNICO">Técnico</option>
               <option value="RC">RC / Representante Comercial</option>
               <option value="FUNCIONARIO">Funcionário BMC</option>
-              <option value="GESTOR">Gestor</option>
               <option value="ADMIN">Administrador</option>
             </select>
           </div>
           <Field label="Cargo / função" name="position" />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Gestor responsável (opcional)
-            </label>
-            <select
-              name="managerId"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">— nenhum —</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {state.error && (
             <p className="col-span-full rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {state.error}
