@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
@@ -89,10 +89,10 @@ export default async function TrainingDetailPage({
     })
     .from(trainingAssignments)
     .innerJoin(users, eq(trainingAssignments.userId, users.id))
-    .where(eq(trainingAssignments.trainingId, id));
+    .where(and(eq(trainingAssignments.trainingId, id), isNull(users.deletedAt)));
 
   const assignedIds = new Set(assignments.map((a) => a.userId));
-  const availableUsers = (await db.select().from(users).where(eq(users.active, true))).filter(
+  const availableUsers = (await db.select().from(users).where(and(eq(users.active, true), isNull(users.deletedAt)))).filter(
     (u) =>
       !assignedIds.has(u.id) &&
       (u.role === "TECNICO" || u.role === "RC" || u.role === "FUNCIONARIO")
