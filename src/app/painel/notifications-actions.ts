@@ -9,7 +9,7 @@ import { userNotifications } from "@/db/schema";
 /** Marca uma notificação como lida — só se ela pertencer a quem está
  * logado (evita marcar/ver notificação de outra pessoa pela id). */
 export async function markNotificationReadAction(notificationId: string) {
-  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO", "ADMIN", "GESTOR"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO", "ADMIN"]);
   await db
     .update(userNotifications)
     .set({ read: true })
@@ -20,7 +20,7 @@ export async function markNotificationReadAction(notificationId: string) {
 }
 
 export async function markAllNotificationsReadAction() {
-  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO", "ADMIN", "GESTOR"]);
+  const session = await requireUser(["TECNICO", "RC", "FUNCIONARIO", "ADMIN"]);
   await db
     .update(userNotifications)
     .set({ read: true })
