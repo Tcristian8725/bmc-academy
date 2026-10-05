@@ -43,7 +43,7 @@ export default function CadastroForm() {
 
   useEffect(() => {
     if (state.success) {
-      // Cadastro enviado: vai para a tela "Aguardando aprovação do gestor".
+      // Cadastro enviado: vai para a tela "Aguardando aprovação".
       router.push("/aguardando-aprovacao");
       router.refresh();
     }
@@ -272,7 +272,7 @@ export default function CadastroForm() {
         {pending ? "Enviando..." : "Enviar cadastro para aprovação"}
       </button>
       <p className="text-center text-xs text-gray-400">
-        Depois de enviar, o seu acesso fica aguardando a aprovação do gestor.
+        Depois de enviar, o seu acesso fica aguardando a aprovação da equipe da BMC Academy.
       </p>
     </form>
   );
