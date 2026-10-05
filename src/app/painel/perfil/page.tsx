@@ -80,6 +80,8 @@ export default async function MeuPerfilPage() {
           <Field label="Departamento" value={user.department} />
           <Field label="Filial" value={branch?.name ?? null} />
           <Field label="Endereço" value={user.address} />
+          <Field label="Cidade / UF" value={[user.city, user.state].filter(Boolean).join(" / ") || null} />
+          <Field label="CEP" value={user.cep} />
           <Field
             label="Cadastro"
                         value={user.createdAt ? formatDateBR(user.createdAt) : null}
