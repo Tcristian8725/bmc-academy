@@ -7,6 +7,9 @@ import { users, branches, certificates, trainings } from "@/db/schema";
 import { listAssignmentsForUser } from "@/lib/training-flow";
 import { formatDateBR, formatDateTimeBR } from "@/lib/datetime";
 import EditProfileForm from "./edit-profile-form";
+import { APPROVAL_LABEL, type ApprovalStatus } from "@/lib/approval";
+import { regionOfUf } from "@/lib/regions";
+import { deleteUserAction } from "../actions";
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
@@ -33,7 +36,7 @@ export default async function PerfilUsuarioPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireUser(["ADMIN"]);
+  const session = await requireUser(["ADMIN"]);
   const { id } = await params;
 
   const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -101,6 +104,14 @@ export default async function PerfilUsuarioPage({
           <Field label="Departamento" value={user.department} />
           <Field label="Filial" value={branch?.name ?? null} />
           <Field label="Endereço" value={user.address} />
+          <Field label="CEP" value={user.cep} />
+          <Field label="Cidade" value={user.city} />
+          <Field label="UF" value={user.state} />
+          <Field label="Região" value={user.state ? regionOfUf(user.state) : null} />
+          <Field
+            label="Situação do cadastro"
+            value={APPROVAL_LABEL[user.approvalStatus as ApprovalStatus] ?? user.approvalStatus}
+          />
           <Field
             label="Cadastro"
             value={user.createdAt ? formatDateBR(user.createdAt) : null}
@@ -122,6 +133,9 @@ export default async function PerfilUsuarioPage({
             position: user.position,
             department: user.department,
             address: user.address,
+            cep: user.cep,
+            city: user.city,
+            state: user.state,
           }}
         />
       </div>
@@ -177,6 +191,33 @@ export default async function PerfilUsuarioPage({
           })}
         </div>
       </div>
+
+      {/* Excluir usuário (rodada 41) */}
+      {user.id !== session.userId && (
+        <details className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+          <summary className="cursor-pointer text-sm font-semibold text-red-600">
+            Excluir este usuário
+          </summary>
+          <form action={deleteUserAction.bind(null, user.id)} className="mt-3 space-y-3">
+            <p className="text-sm text-gray-600">
+              Isso apaga <strong>{user.name}</strong> de vez, com o progresso, as provas, os
+              certificados e as notificações dele. Não dá para desfazer. Se você só quer
+              bloquear o acesso e manter o histórico, use &quot;Desativar&quot; na lista de
+              usuários.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" name="confirm" value="yes" required />
+              Entendo que a exclusão é permanente.
+            </label>
+            <button
+              type="submit"
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+            >
+              Excluir usuário definitivamente
+            </button>
+          </form>
+        </details>
+      )}
     </div>
   );
 }
