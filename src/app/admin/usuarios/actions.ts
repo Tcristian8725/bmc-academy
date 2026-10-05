@@ -2,18 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { requireUser, hashPassword } from "@/lib/auth";
 import { db } from "@/db";
-import {
-  certificates,
-  examAttempts,
-  lessonProgress,
-  progress,
-  trainingAssignments,
-  userNotifications,
-  users,
-} from "@/db/schema";
+import { users } from "@/db/schema";
 import { logAudit } from "@/lib/audit";
 import { assignPublishedTrainingsToUser } from "@/lib/assignments";
 import { isApprovalStatus, notifyUserApprovalChange } from "@/lib/approval";
@@ -35,12 +27,10 @@ export async function createUserAction(
   const password = String(formData.get("password") || "");
   const role = String(formData.get("role") || "TECNICO") as
     | "ADMIN"
-    | "GESTOR"
     | "TECNICO"
     | "RC"
     | "FUNCIONARIO";
   const position = String(formData.get("position") || "") || null;
-  const managerId = String(formData.get("managerId") || "") || null;
 
   if (!name || !email || !password) {
     return { error: "Preencha nome, e-mail e senha." };
@@ -51,14 +41,18 @@ export async function createUserAction(
 
   const [existing] = await db.select().from(users).where(eq(users.email, email));
   if (existing) {
-    return { error: "Já existe um usuário com este e-mail." };
+    return {
+      error: existing.deletedAt
+        ? "Este e-mail pertence a um usuário excluído. Restaure-o em Usuários > Excluídos para ele continuar de onde parou."
+        : "Já existe um usuário com este e-mail.",
+    };
   }
 
   const passwordHash = await hashPassword(password);
 
   const [created] = await db
     .insert(users)
-    .values({ name, email, passwordHash, role, position, managerId })
+    .values({ name, email, passwordHash, role, position })
     .returning();
 
   await logAudit(session.userId!, "USER_CREATED", { email, role });
@@ -82,13 +76,15 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
 
   const role = String(formData.get("role") || "") as
     | "ADMIN"
-    | "GESTOR"
     | "TECNICO"
     | "RC"
     | "FUNCIONARIO";
-  if (!["ADMIN", "GESTOR", "TECNICO", "RC", "FUNCIONARIO"].includes(role)) return;
+  if (!["ADMIN", "TECNICO", "RC", "FUNCIONARIO"].includes(role)) return;
 
-  await db.update(users).set({ role }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ role })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)));
   await logAudit(session.userId!, "USER_ROLE_CHANGED", { userId, role });
 
   // Mudou de perfil? Garante que já fique com os treinamentos publicados do
@@ -100,7 +96,11 @@ export async function updateUserRoleAction(userId: string, formData: FormData) {
 
 export async function toggleUserActiveAction(userId: string, active: boolean) {
   const session = await requireUser(["ADMIN"]);
-  await db.update(users).set({ active }).where(eq(users.id, userId));
+  // Usuário excluído só volta pela ação "Restaurar".
+  await db
+    .update(users)
+    .set({ active })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)));
   await logAudit(session.userId!, active ? "USER_REACTIVATED" : "USER_DEACTIVATED", { userId });
   revalidatePath("/admin/usuarios");
 }
@@ -119,7 +119,7 @@ export async function updateApprovalStatusAction(userId: string, formData: FormD
   if (!isApprovalStatus(status)) return;
 
   const [target] = await db.select().from(users).where(eq(users.id, userId));
-  if (!target || target.approvalStatus === status) return;
+  if (!target || target.deletedAt || target.approvalStatus === status) return;
 
   await db.update(users).set({ approvalStatus: status }).where(eq(users.id, userId));
   await logAudit(session.userId!, "USER_APPROVAL_CHANGED", {
@@ -193,11 +193,13 @@ export async function updateUserProfileAction(
   return { success: true };
 }
 
-/** Exclui um usuário de vez (rodada 41), junto com tudo que é dele: progresso,
- * atribuições, tentativas de prova, certificados e notificações. Só
- * administrador, exige a confirmação marcada, e nunca deixa excluir a própria
- * conta nem o último administrador ativo. Para só bloquear o acesso sem apagar
- * o histórico, existe "Desativar". */
+/** "Excluir" usuário (rodada 42): ARQUIVA, não apaga. Todo o histórico da
+ * pessoa (progresso, aulas assistidas, provas, certificados, atribuições,
+ * notificações) continua guardado no banco, só que oculto das listas e dos
+ * números do admin, e a pessoa não consegue mais entrar. Quem foi excluído
+ * pode voltar no futuro e continuar de onde parou — ver restoreUserAction.
+ * Só administrador, exige a confirmação marcada, e nunca deixa excluir a
+ * própria conta nem o último administrador ativo. */
 export async function deleteUserAction(userId: string, formData: FormData) {
   const session = await requireUser(["ADMIN"]);
 
@@ -205,38 +207,60 @@ export async function deleteUserAction(userId: string, formData: FormData) {
   if (userId === session.userId) return;
 
   const [target] = await db.select().from(users).where(eq(users.id, userId));
-  if (!target) return;
+  if (!target || target.deletedAt) return;
 
   if (target.role === "ADMIN") {
     const admins = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.role, "ADMIN"), eq(users.active, true)));
+      .where(and(eq(users.role, "ADMIN"), eq(users.active, true), isNull(users.deletedAt)));
     if (admins.filter((a) => a.id !== userId).length === 0) return;
   }
 
-  // certificates.examAttemptId referencia exam_attempts — certificados primeiro.
-  await db.delete(certificates).where(eq(certificates.userId, userId));
-  await db.delete(examAttempts).where(eq(examAttempts.userId, userId));
-  await db.delete(lessonProgress).where(eq(lessonProgress.userId, userId));
-  await db.delete(progress).where(eq(progress.userId, userId));
-  await db.delete(trainingAssignments).where(eq(trainingAssignments.userId, userId));
+  // Mantém approvalStatus e todo o resto como está: ao restaurar, a pessoa
+  // volta exatamente na situação em que estava.
   await db
-    .update(trainingAssignments)
-    .set({ assignedBy: null })
-    .where(eq(trainingAssignments.assignedBy, userId));
-  await db.delete(userNotifications).where(eq(userNotifications.userId, userId));
-  await db.update(users).set({ managerId: null }).where(eq(users.managerId, userId));
-  await db.delete(users).where(eq(users.id, userId));
+    .update(users)
+    .set({ deletedAt: new Date().toISOString(), active: false })
+    .where(eq(users.id, userId));
 
   await logAudit(session.userId!, "USER_DELETED", {
     userId,
     name: target.name,
     email: target.email,
     role: target.role,
+    archived: true,
   });
 
+  revalidatePath("/admin");
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/aprovacoes");
   redirect("/admin/usuarios");
+}
+
+/** Traz de volta um usuário excluído: reativa o acesso e o histórico volta a
+ * aparecer, então a pessoa continua de onde parou. Treinamentos publicados
+ * enquanto ela estava fora são atribuídos (nunca remove nada). */
+export async function restoreUserAction(userId: string) {
+  const session = await requireUser(["ADMIN"]);
+
+  const [target] = await db.select().from(users).where(eq(users.id, userId));
+  if (!target || !target.deletedAt) return;
+
+  await db.update(users).set({ deletedAt: null, active: true }).where(eq(users.id, userId));
+  await logAudit(session.userId!, "USER_RESTORED", {
+    userId,
+    name: target.name,
+    email: target.email,
+  });
+
+  if (target.approvalStatus === "APROVADO") {
+    await assignPublishedTrainingsToUser(userId, target.role);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/usuarios");
+  revalidatePath("/admin/aprovacoes");
+  revalidatePath(`/admin/usuarios/${userId}`);
+  redirect(`/admin/usuarios/${userId}`);
 }
