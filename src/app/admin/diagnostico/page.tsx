@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { listDiagnosticEntries } from "@/lib/diagnostic-videos";
-import { toPlainEmbedUrl } from "@/lib/video";
+import { toEmbedUrl } from "@/lib/video";
 import VideoLibrary from "@/app/painel/diagnostico/video-library";
 import Link from "next/link";
 import { formatDateBR } from "@/lib/datetime";
@@ -50,7 +50,7 @@ export default async function AdminDiagnosticoPage() {
             title: v.title,
             description: v.description,
             topic: v.topic,
-            embedUrl: toPlainEmbedUrl(v.videoUrl),
+            embedUrl: toEmbedUrl(v.videoUrl),
           }))}
         />
       </section>
