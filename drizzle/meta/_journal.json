@@ -43,6 +43,13 @@
       "when": 1790076472762,
       "tag": "0005_cloudy_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791202759918,
+      "tag": "0006_diagnostic_videos",
+      "breakpoints": true
     }
   ]
 }
