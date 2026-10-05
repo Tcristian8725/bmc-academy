@@ -20,6 +20,7 @@ import {
 // e assertLessonsCompletedForExam).
 export const WATCH_THRESHOLD_PERCENT = 70;
 import { logAudit } from "./audit";
+import { getDiagnosticTrainingIds } from "./diagnostic-ids";
 import {
   generateCertificateCode,
   generateCertificatePdf,
@@ -62,7 +63,12 @@ export async function listAssignmentsForUser(userId: string): Promise<Assignment
     )
     .where(eq(trainingAssignments.userId, userId));
 
-  return rows.map((r) => ({
+  // Vídeos de Diagnóstico não contam como treinamento (rodada 42).
+  const diagnosticIds = await getDiagnosticTrainingIds();
+
+  return rows
+    .filter((r) => !diagnosticIds.has(r.trainingId))
+    .map((r) => ({
     assignmentId: r.assignmentId,
     trainingId: r.trainingId,
     title: r.title,
@@ -543,7 +549,6 @@ export async function issueCertificateForTraining(
 
   const roleLabel: Record<string, string> = {
     ADMIN: "Administrador",
-    GESTOR: "Gestor",
     TECNICO: "Técnico",
     RC: "Representante Comercial",
     FUNCIONARIO: "Funcionário BMC",
