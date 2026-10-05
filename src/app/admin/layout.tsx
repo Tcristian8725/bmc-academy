@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   let pending = 0;
   try {
     const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS c FROM users WHERE approval_status = 'PENDENTE' AND profile_completed = true`
+      `SELECT COUNT(*)::int AS c FROM users WHERE approval_status = 'PENDENTE' AND profile_completed = true AND deleted_at IS NULL`
     );
     pending = Number(rows[0]?.c ?? 0);
   } catch {
