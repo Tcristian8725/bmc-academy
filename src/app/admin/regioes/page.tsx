@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pool } from "@/db";
 import { requireUser } from "@/lib/auth";
+import { DIAGNOSTIC_TRAINING_IDS_SQL } from "@/lib/diagnostic-ids";
 import { NO_REGION, REGIONS, UF_REGION, regionOfUf } from "@/lib/regions";
 
 interface UserRow {
@@ -34,7 +35,7 @@ export default async function RegioesPage({
   // Só contam pessoas aprovadas, nos perfis que fazem treinamentos.
   const { rows: people } = await pool.query<UserRow>(
     `SELECT id, role, state FROM users
-     WHERE active = true AND approval_status = 'APROVADO'
+     WHERE active = true AND deleted_at IS NULL AND approval_status = 'APROVADO'
        AND role IN ('TECNICO','RC','FUNCIONARIO')`
   );
 
@@ -44,7 +45,8 @@ export default async function RegioesPage({
      FROM progress p
      JOIN users u ON u.id = p.user_id
      JOIN trainings t ON t.id = p.training_id
-     WHERE u.active = true AND u.approval_status = 'APROVADO'
+     WHERE u.active = true AND u.deleted_at IS NULL AND u.approval_status = 'APROVADO'
+       AND p.training_id NOT IN ${DIAGNOSTIC_TRAINING_IDS_SQL}
        AND u.role IN ('TECNICO','RC','FUNCIONARIO')
      GROUP BY u.state, t.id, t.title, p.status`
   );
