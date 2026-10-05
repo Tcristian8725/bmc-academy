@@ -28,6 +28,12 @@ export async function requestAccessAction(
   }
 
   const [existing] = await db.select().from(users).where(eq(users.email, email));
+  if (existing?.deletedAt) {
+    return {
+      error:
+        "Este e-mail já tem cadastro na BMC Academy e está desativado. Fale com um administrador para reativar o seu acesso.",
+    };
+  }
   if (existing) {
     return {
       error: "Já existe uma conta com este e-mail. Se você já tem conta, faça login normalmente.",
