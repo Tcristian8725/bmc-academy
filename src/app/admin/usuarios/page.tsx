@@ -157,14 +157,13 @@ export default async function UsuariosPage({
               <th className="px-4 py-3">Cadastro</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Último acesso</th>
-              <th className="px-4 py-3"></th>
-              <th className="px-4 py-3"></th>
+              <th className="sticky right-0 bg-white px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {visibleUsers.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
                   Nenhum usuário encontrado{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}.
                 </td>
               </tr>
@@ -246,16 +245,14 @@ export default async function UsuariosPage({
                 <td className="px-4 py-3 text-gray-500">
                   {u.lastLoginAt ? formatDateTimeBR(u.lastLoginAt) : "—"}
                 </td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/admin/usuarios/${u.id}`}
-                    className="text-xs font-medium text-brand hover:underline"
-                  >
-                    Ver perfil
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-3">
+                <td className="sticky right-0 bg-white px-4 py-3 text-right shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.12)]">
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Link
+                      href={`/admin/usuarios/${u.id}`}
+                      className="text-xs font-medium text-brand hover:underline"
+                    >
+                      Ver perfil
+                    </Link>
                     <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
                       <button
                         type="submit"
