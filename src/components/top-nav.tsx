@@ -5,8 +5,7 @@ import NotificationBell, { type NotificationItem } from "@/components/notificati
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
-  GESTOR: "Gestor",
-  TECNICO: "Técnico",
+    TECNICO: "Técnico",
   RC: "Representante Comercial",
   FUNCIONARIO: "Funcionário BMC",
 };
