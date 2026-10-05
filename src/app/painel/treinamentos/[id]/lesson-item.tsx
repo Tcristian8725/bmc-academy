@@ -95,6 +95,11 @@ function YouTubeGatedPlayer({
     mute: () => void;
     unMute: () => void;
     isMuted: () => boolean;
+    // Módulo de legendas do YouTube — não consta na documentação oficial da
+    // IFrame API, mas é o jeito conhecido de ligar/desligar a legenda quando
+    // os controles nativos (e o botão "CC" deles) estão desligados.
+    loadModule?: (module: string) => void;
+    unloadModule?: (module: string) => void;
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSentRef = useRef(initialWatchedPercent);
@@ -117,6 +122,32 @@ function YouTubeGatedPlayer({
   const [volume, setVolume] = useState(100);
   const [ready, setReady] = useState(false);
   const seekingRef = useRef(false);
+
+  // Legenda e tela cheia (rodada 40): o embed já nasce com legenda ligada
+  // (`cc_load_policy=1`, ver video.ts) e o botão "CC" deixa a pessoa
+  // remover/recolocar. Tela cheia é feita no container (vídeo + controles
+  // próprios), não no iframe sozinho — senão os controles somem na tela
+  // cheia. Em navegadores sem a Fullscreen API em elementos (ex.: iPhone), cai
+  // numa "tela cheia" por CSS (container fixo cobrindo a janela).
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [captionsOn, setCaptionsOn] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cssFullscreen, setCssFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!cssFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCssFullscreen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [cssFullscreen]);
 
   useEffect(() => {
     let destroyed = false;
@@ -265,6 +296,40 @@ function YouTubeGatedPlayer({
     }
   }
 
+  function toggleCaptions() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (captionsOn) {
+      player.unloadModule?.("captions");
+      setCaptionsOn(false);
+    } else {
+      player.loadModule?.("captions");
+      setCaptionsOn(true);
+    }
+  }
+
+  function toggleFullscreen() {
+    const el = containerRef.current as
+      | (HTMLDivElement & { webkitRequestFullscreen?: () => void })
+      | null;
+    if (!el) return;
+    if (cssFullscreen) {
+      setCssFullscreen(false);
+      return;
+    }
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+      return;
+    }
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => setCssFullscreen(true));
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    } else {
+      setCssFullscreen(true);
+    }
+  }
+
   function handleVolumeChange(e: React.ChangeEvent<HTMLInputElement>) {
     const next = Number(e.target.value);
     setVolume(next);
@@ -281,7 +346,14 @@ function YouTubeGatedPlayer({
           ícone de compartilhar/assistir depois e o botão "Assista no
           YouTube" — os controles abaixo (play/pause, progresso, volume) são
           próprios, feitos com a IFrame API do YouTube. */}
-      <div className="group relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+      <div
+        ref={containerRef}
+        className={
+          cssFullscreen
+            ? "group fixed inset-0 z-50 h-full w-full overflow-hidden bg-black"
+            : "group relative aspect-video w-full overflow-hidden rounded-lg bg-black [&:fullscreen]:aspect-auto [&:fullscreen]:h-full [&:fullscreen]:rounded-none"
+        }
+      >
         <iframe
           id={iframeId.current}
           src={embedUrl}
@@ -379,6 +451,38 @@ function YouTubeGatedPlayer({
             aria-label="Volume"
             className="h-1 w-14 shrink-0 accent-white"
           />
+
+          <button
+            type="button"
+            onClick={toggleCaptions}
+            disabled={!ready}
+            aria-label={captionsOn ? "Desativar legenda" : "Ativar legenda"}
+            aria-pressed={captionsOn}
+            title={captionsOn ? "Remover legenda" : "Mostrar legenda"}
+            className={`shrink-0 rounded px-1 text-[10px] font-bold leading-4 ring-1 ring-inset ${
+              captionsOn ? "bg-white text-black ring-white" : "text-white ring-white/60"
+            }`}
+          >
+            CC
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen || cssFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            title={isFullscreen || cssFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            className="shrink-0 text-white"
+          >
+            {isFullscreen || cssFullscreen ? (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
       <div className="mt-2">
