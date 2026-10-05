@@ -68,18 +68,6 @@ async function main() {
     })
     .returning();
 
-  const [gestor] = await db
-    .insert(users)
-    .values({
-      name: "Gestor Exemplo (teste)",
-      email: "gestor@teste.bmcacademy.local",
-      passwordHash: hash("gestor123"),
-      role: "GESTOR",
-      position: "Gestor de equipe (exemplo)",
-      branchId: matriz.id,
-    })
-    .returning();
-
   const [tecnico] = await db
     .insert(users)
     .values({
@@ -88,7 +76,6 @@ async function main() {
       passwordHash: hash("tecnico123"),
       role: "TECNICO",
       position: "Técnico de campo",
-      managerId: gestor.id,
       branchId: matriz.id,
     })
     .returning();
@@ -101,7 +88,6 @@ async function main() {
       passwordHash: hash("rc123456"),
       role: "RC",
       position: "Representante Comercial (exemplo)",
-      managerId: gestor.id,
       branchId: matriz.id,
     })
     .returning();
@@ -260,7 +246,6 @@ async function main() {
   console.log("\nSeed concluído. Usuários de teste:");
   console.table([
     { papel: "ADMIN", email: admin.email, senha: "admin123" },
-    { papel: "GESTOR", email: gestor.email, senha: "gestor123" },
     { papel: "TECNICO", email: tecnico.email, senha: "tecnico123" },
     { papel: "RC", email: rc.email, senha: "rc123456" },
   ]);
