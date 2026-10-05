@@ -14,6 +14,10 @@ export async function verifyPassword(plain: string, hash: string) {
   return bcrypt.compare(plain, hash);
 }
 
+function isUserRole(role: string): role is UserRole {
+  return role === "ADMIN" || role === "TECNICO" || role === "RC" || role === "FUNCIONARIO";
+}
+
 export interface LoginResult {
   ok: boolean;
   error?: string;
@@ -23,7 +27,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   const normalizedEmail = email.trim().toLowerCase();
   const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail));
 
-  if (!user || !user.active) {
+  if (!user || !user.active || user.deletedAt) {
     await logAudit(null, "LOGIN_FAILED", { email: normalizedEmail, reason: "not_found_or_inactive" });
     return { ok: false, error: "E-mail ou senha inválidos." };
   }
@@ -74,20 +78,26 @@ export async function requireUser(allowedRoles?: UserRole[]) {
   if (session.profileCompleted === false) {
     redirect("/cadastro");
   }
+  // Consulta o banco a cada página (e não o cookie) para que a decisão do
+  // admin valha na hora: usuário excluído/desativado perde o acesso e o papel
+  // (ex.: virou Administrador) vale logo.
+  const [row] = await db
+    .select({
+      approvalStatus: users.approvalStatus,
+      active: users.active,
+      deletedAt: users.deletedAt,
+      role: users.role,
+    })
+    .from(users)
+    .where(eq(users.id, session.userId));
+  if (!row || row.deletedAt || !row.active || !isUserRole(row.role)) {
+    redirect("/login");
+  }
+  session.role = row.role;
   // Aprovação de cadastro (rodada 40): só quem está APROVADO entra nas áreas
-  // protegidas. Consulta o banco a cada página (e não o cookie) para que a
-  // decisão do admin valha na hora. Administradores nunca ficam bloqueados.
-  if (session.role !== "ADMIN") {
-    const [row] = await db
-      .select({ approvalStatus: users.approvalStatus })
-      .from(users)
-      .where(eq(users.id, session.userId));
-    if (!row) {
-      redirect("/login");
-    }
-    if (row.approvalStatus !== "APROVADO") {
-      redirect("/aguardando-aprovacao");
-    }
+  // protegidas. Administradores nunca ficam bloqueados.
+  if (row.role !== "ADMIN" && row.approvalStatus !== "APROVADO") {
+    redirect("/aguardando-aprovacao");
   }
   if (allowedRoles && !allowedRoles.includes(session.role as UserRole)) {
     redirect("/painel");
