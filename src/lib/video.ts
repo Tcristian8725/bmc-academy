@@ -41,6 +41,9 @@ function withJsApi(embedUrl: string): string {
     u.searchParams.set("modestbranding", "1");
     u.searchParams.set("iv_load_policy", "3");
     u.searchParams.set("controls", "0");
+    // Legenda ligada por padrão (rodada 40); o botão "CC" do player próprio
+    // (lesson-item.tsx) deixa a pessoa remover/recolocar.
+    u.searchParams.set("cc_load_policy", "1");
     return u.toString();
   } catch {
     return embedUrl;
@@ -85,4 +88,31 @@ export function isYouTubeEmbed(embedUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Embed "simples" para a biblioteca de vídeos de diagnóstico (rodada 39): mesmo
+ * link comum do YouTube convertido em /embed/, mas COM os controles nativos
+ * do YouTube (play/pause, barra de progresso, tela cheia) — diferente de
+ * `toEmbedUrl`, que desliga os controles porque o player de treinamento
+ * constrói os próprios para medir o tempo assistido. Aqui não existe
+ * medição nem trava (é consulta), então o player nativo é o certo.
+ */
+export function toPlainEmbedUrl(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const host = parsed.hostname.replace(/^www\.|^m\./, "");
+  let id: string | null = null;
+  if (host === "youtu.be") id = parsed.pathname.slice(1) || null;
+  else if (host === "youtube.com") {
+    if (parsed.pathname === "/watch") id = parsed.searchParams.get("v");
+    else if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/"))
+      id = parsed.pathname.split("/")[2] || null;
+  }
+  if (!id) return url; // Vimeo etc. passam direto
+  return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&cc_load_policy=1`;
 }
