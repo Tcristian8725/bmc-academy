@@ -140,6 +140,23 @@ export const lessonProgress = pgTable("lesson_progress", {
     .notNull(),
 });
 
+// --- Biblioteca de vídeos de diagnóstico (rodada 39) -------------------------
+// Vídeos curtos de consulta técnica, SEM prova, SEM certificado e SEM
+// progresso/atribuição: qualquer Técnico/RC/Funcionário BMC logado vê todos
+// os vídeos publicados na aba "Diagnóstico" do painel. Tabela própria (e não
+// treinamentos + lições) justamente porque não faz sentido ter status
+// "Em andamento/Concluído" nem atribuição por pessoa pra uma biblioteca de
+// consulta.
+export const diagnosticVideos = pgTable("diagnostic_videos", {
+  id: id(),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoUrl: text("video_url").notNull(), // link comum do YouTube/Vimeo (convertido em embed na hora de exibir)
+  topic: text("topic"), // equipamento/tema livre (ex.: "Escavadeira HX220", "Hidráulica") — usado na busca
+  published: boolean("published").notNull().default(true),
+  ...timestamps(),
+});
+
 // --- Trilhas de aprendizagem -------------------------------------------------
 
 export const learningPaths = pgTable("learning_paths", {
