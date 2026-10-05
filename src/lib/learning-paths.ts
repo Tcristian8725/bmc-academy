@@ -18,6 +18,7 @@
  */
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { getDiagnosticTrainingIds } from "@/lib/diagnostic-ids";
 import {
   learningPaths,
   learningPathCourses,
@@ -152,8 +153,10 @@ export async function listLearningPathsForUser(userId: string): Promise<UserLear
     )
     .orderBy(asc(learningPathCourses.order));
 
+  const diagnosticIds = await getDiagnosticTrainingIds();
   const byPath = new Map<string, UserLearningPathCourse[]>();
   for (const r of rows) {
+    if (diagnosticIds.has(r.trainingId)) continue;
     const list = byPath.get(r.learningPathId) ?? [];
     list.push({
       trainingId: r.trainingId,
