@@ -100,6 +100,7 @@ function YouTubeGatedPlayer({
     // os controles nativos (e o botão "CC" deles) estão desligados.
     loadModule?: (module: string) => void;
     unloadModule?: (module: string) => void;
+    setOption?: (module: string, option: string, value: unknown) => void;
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSentRef = useRef(initialWatchedPercent);
@@ -131,6 +132,11 @@ function YouTubeGatedPlayer({
   // numa "tela cheia" por CSS (container fixo cobrindo a janela).
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [captionsOn, setCaptionsOn] = useState(true);
+  // Espelho do estado acima para os callbacks do YouTube (criados uma vez só,
+  // então não enxergam o `captionsOn` atualizado). Quando a pessoa remove a
+  // legenda, o YouTube a reativa sozinho ao pausar/retomar o vídeo — por isso
+  // "desligar" é reaplicado a cada mudança de estado do player e a cada tick.
+  const captionsOnRef = useRef(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cssFullscreen, setCssFullscreen] = useState(false);
 
@@ -207,6 +213,8 @@ function YouTubeGatedPlayer({
           if (!seekingRef.current) {
             setCurrentTime(player.getCurrentTime());
           }
+
+          if (!captionsOnRef.current) hideCaptions(player);
         }, 1000);
       };
 
@@ -233,6 +241,14 @@ function YouTubeGatedPlayer({
             playerRef.current = e.target;
             const d = e.target?.getDuration?.();
             if (d) setDuration(d);
+            if (!captionsOnRef.current && e.target) {
+              const target = e.target;
+              hideCaptions(target);
+              // O YouTube recarrega a legenda um instante depois da mudança
+              // de estado — reaplica logo em seguida para ela não voltar.
+              setTimeout(() => hideCaptions(target), 300);
+              setTimeout(() => hideCaptions(target), 1200);
+            }
             // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
             if (e.data === 1) {
               setIsPlaying(true);
@@ -296,15 +312,25 @@ function YouTubeGatedPlayer({
     }
   }
 
+  function hideCaptions(player: NonNullable<typeof playerRef.current>) {
+    // Zera a faixa escolhida (nenhuma legenda, nem tradução automática) e
+    // descarrega os módulos de legenda.
+    player.setOption?.("captions", "track", {});
+    player.unloadModule?.("captions");
+    player.unloadModule?.("cc");
+  }
+
   function toggleCaptions() {
     const player = playerRef.current;
     if (!player) return;
     if (captionsOn) {
-      player.unloadModule?.("captions");
+      captionsOnRef.current = false;
       setCaptionsOn(false);
+      hideCaptions(player);
     } else {
-      player.loadModule?.("captions");
+      captionsOnRef.current = true;
       setCaptionsOn(true);
+      player.loadModule?.("captions");
     }
   }
 
