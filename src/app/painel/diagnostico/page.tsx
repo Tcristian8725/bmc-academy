@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { listDiagnosticEntries } from "@/lib/diagnostic-videos";
-import { toPlainEmbedUrl } from "@/lib/video";
+import { toEmbedUrl } from "@/lib/video";
 import VideoLibrary from "./video-library";
 
 export default async function PainelDiagnosticoPage() {
@@ -22,7 +22,7 @@ export default async function PainelDiagnosticoPage() {
           title: v.title,
           description: v.description,
           topic: v.topic,
-          embedUrl: toPlainEmbedUrl(v.videoUrl),
+          embedUrl: toEmbedUrl(v.videoUrl),
         }))}
       />
     </div>
