@@ -49,7 +49,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(), // login — de preferência o e-mail usado no SAB
   passwordHash: text("password_hash").notNull(),
   role: text("role", {
-    enum: ["ADMIN", "GESTOR", "TECNICO", "RC", "FUNCIONARIO"],
+    enum: ["ADMIN", "TECNICO", "RC", "FUNCIONARIO"],
   }).notNull(),
   registrationNumber: text("registration_number"), // matrícula
   phone: text("phone"),
@@ -81,6 +81,10 @@ export const users = pgTable("users", {
   // Contas criadas pelo admin já nascem com o perfil completo (default true).
   profileCompleted: boolean("profile_completed").notNull().default(true),
   active: boolean("active").notNull().default(true),
+  // Exclusão reversível (rodada 42): "Excluir" só arquiva. Todo o histórico
+  // (progresso, provas, certificados, atribuições) fica guardado no banco e
+  // oculto das telas; ao restaurar, a pessoa continua de onde parou.
+  deletedAt: timestamp("deleted_at", { mode: "string", withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { mode: "string", withTimezone: true }),
   ...timestamps(),
 });
