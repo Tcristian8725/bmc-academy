@@ -19,6 +19,9 @@ export default function EditProfileForm({
     position: string | null;
     department: string | null;
     address: string | null;
+    cep: string | null;
+    city: string | null;
+    state: string | null;
   };
 }) {
   const action = updateUserProfileAction.bind(null, userId);
@@ -43,6 +46,9 @@ export default function EditProfileForm({
           <Field label="WhatsApp" name="whatsapp" defaultValue={initial.whatsapp} />
           <Field label="Cargo" name="position" defaultValue={initial.position} />
           <Field label="Departamento" name="department" defaultValue={initial.department} />
+          <Field label="CEP" name="cep" defaultValue={initial.cep} />
+          <Field label="Cidade" name="city" defaultValue={initial.city} />
+          <Field label="UF (ex.: PA)" name="state" defaultValue={initial.state} />
           <div className="sm:col-span-2 lg:col-span-3">
             <label className="mb-1 block text-sm font-medium text-gray-700">Endereço</label>
             <input
