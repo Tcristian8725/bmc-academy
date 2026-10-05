@@ -63,6 +63,19 @@ export const users = pgTable("users", {
   // terceirizada podem ser técnicas/RCs) — de propósito, sem restrição de único.
   cnpj: text("cnpj"),
   address: text("address"), // endereço completo — texto livre por enquanto
+  // Endereço estruturado (rodada 40): usado pra agrupar técnicos e
+  // treinamentos por estado/região (Admin > Regiões).
+  cep: text("cep"),
+  city: text("city"), // cidade
+  state: text("state"), // UF (2 letras, ex.: "PA")
+  // Aprovação de cadastro (rodada 40). Contas criadas pelo autocadastro
+  // público nascem PENDENTE e só entram no painel depois que um Admin
+  // aprovar. Contas criadas pelo admin e todas as já existentes são APROVADO.
+  approvalStatus: text("approval_status", {
+    enum: ["PENDENTE", "APROVADO", "AGUARDANDO_HOMOLOGACAO", "NAO_HOMOLOGADO"],
+  })
+    .notNull()
+    .default("APROVADO"),
   // false só para contas criadas pelo autocadastro público (/solicitar-acesso),
   // até a pessoa completar nome/CPF/CNPJ/endereço/tipo no primeiro acesso.
   // Contas criadas pelo admin já nascem com o perfil completo (default true).
