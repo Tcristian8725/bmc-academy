@@ -57,6 +57,13 @@
       "when": 1791220700791,
       "tag": "0007_user_approval_address",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791231766062,
+      "tag": "0008_hard_fantastic_four",
+      "breakpoints": true
     }
   ]
 }
