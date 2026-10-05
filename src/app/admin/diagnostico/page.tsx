@@ -1,5 +1,8 @@
 import { requireUser } from "@/lib/auth";
-import { listAllDiagnosticVideos } from "@/lib/diagnostic-videos";
+import { listDiagnosticEntries } from "@/lib/diagnostic-videos";
+import { toPlainEmbedUrl } from "@/lib/video";
+import VideoLibrary from "@/app/painel/diagnostico/video-library";
+import Link from "next/link";
 import { formatDateBR } from "@/lib/datetime";
 import {
   addDiagnosticVideoAction,
@@ -9,7 +12,9 @@ import {
 
 export default async function AdminDiagnosticoPage() {
   await requireUser(["ADMIN"]);
-  const videos = await listAllDiagnosticVideos();
+  const { entries, withoutVideo } = await listDiagnosticEntries({ onlyPublished: false });
+  const trail = entries.filter((e) => e.source === "trilha");
+  const videos = entries.filter((e) => e.source === "avulso");
 
   return (
     <div className="space-y-6">
@@ -17,10 +22,40 @@ export default async function AdminDiagnosticoPage() {
         <h1 className="text-2xl font-semibold text-foreground">Vídeos de diagnóstico</h1>
         <p className="text-sm text-gray-500">
           Biblioteca de consulta técnica em vídeo: sem prova, sem certificado e sem progresso.
-          Todo Técnico, RC e Funcionário BMC vê os vídeos publicados na aba
-          &quot;Diagnóstico&quot; do painel.
+          Todo Técnico, RC e Funcionário BMC vê, na aba &quot;Diagnóstico&quot; do painel, os
+          vídeos da trilha &quot;Vídeos de Diagnóstico&quot; (treinamentos publicados) e os
+          vídeos avulsos publicados abaixo.
         </p>
       </div>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            Vídeos da trilha &quot;Vídeos de Diagnóstico&quot; ({trail.length})
+          </h2>
+          <Link href="/admin/trilhas" className="text-xs font-medium text-brand hover:underline">
+            Gerenciar trilhas
+          </Link>
+        </div>
+        {withoutVideo.length > 0 && (
+          <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-amber-200">
+            Estes treinamentos estão na trilha mas não têm aula com vídeo (YouTube/Vimeo), então
+            não aparecem na lista: {withoutVideo.join(", ")}. Edite o treinamento e adicione a aula
+            como &quot;Vídeo (URL de embed)&quot;.
+          </p>
+        )}
+        <VideoLibrary
+          videos={trail.map((v) => ({
+            id: v.id,
+            title: v.title,
+            description: v.description,
+            topic: v.topic,
+            embedUrl: toPlainEmbedUrl(v.videoUrl),
+          }))}
+        />
+      </section>
+
+      <h2 className="text-lg font-semibold text-foreground">Vídeos avulsos</h2>
 
       <details open className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
         <summary className="cursor-pointer text-sm font-semibold text-brand">
@@ -70,7 +105,7 @@ export default async function AdminDiagnosticoPage() {
               <p className="truncate font-medium text-foreground">{v.title}</p>
               <p className="truncate text-xs text-gray-500">
                 {v.topic ? `${v.topic} · ` : ""}
-                {formatDateBR(v.createdAt)} ·{" "}
+                {v.createdAt ? `${formatDateBR(v.createdAt)} · ` : ""}
                 <a
                   href={v.videoUrl}
                   target="_blank"
