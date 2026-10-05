@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [user] = await db.select().from(users).where(eq(users.email, email));
-    if (!user) {
+    if (!user || user.deletedAt) {
       return NextResponse.json({ ok: false, error: `Usuário "${email}" não encontrado.` }, { status: 404 });
     }
 
