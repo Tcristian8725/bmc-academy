@@ -17,6 +17,10 @@ export default async function AdminDashboard() {
   const { rows: rcRows } = await pool.query(
     `SELECT COUNT(*)::int as c FROM users WHERE role = 'RC'`
   );
+  const { rows: pendingRows } = await pool.query(
+    `SELECT COUNT(*)::int as c FROM users WHERE approval_status = 'PENDENTE'`
+  );
+  const pendingSignups: number = pendingRows[0].c;
   const totalTrainings = await count("trainings");
   const totalCertificates = await count("certificates");
 
@@ -41,6 +45,16 @@ export default async function AdminDashboard() {
         <h1 className="text-2xl font-semibold text-foreground">Painel administrativo</h1>
         <p className="text-sm text-gray-500">Visão geral da BMC Academy</p>
       </div>
+
+      {pendingSignups > 0 && (
+        <Link
+          href="/admin/aprovacoes"
+          className="block rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
+        >
+          {pendingSignups} {pendingSignups === 1 ? "cadastro aguardando" : "cadastros aguardando"}{" "}
+          aprovação — clique para revisar.
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Usuários" value={totalUsers} href="/admin/usuarios" />
