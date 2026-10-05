@@ -1,4 +1,4 @@
-import { eq, desc, isNotNull } from "drizzle-orm";
+import { and, eq, desc, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { examAttempts, exams, trainings, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -22,7 +22,7 @@ export default async function ProvasPage() {
     .innerJoin(exams, eq(examAttempts.examId, exams.id))
     .innerJoin(trainings, eq(exams.trainingId, trainings.id))
     .innerJoin(users, eq(examAttempts.userId, users.id))
-    .where(isNotNull(examAttempts.scorePercent))
+    .where(and(isNotNull(examAttempts.scorePercent), isNull(users.deletedAt)))
     .orderBy(desc(examAttempts.submittedAt));
 
   const avg =
