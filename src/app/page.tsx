@@ -7,6 +7,5 @@ export default async function Home() {
     redirect("/login");
   }
   if (session.role === "ADMIN") redirect("/admin");
-  if (session.role === "GESTOR") redirect("/gestor");
   redirect("/painel");
 }
