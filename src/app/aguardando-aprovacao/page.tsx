@@ -9,8 +9,8 @@ import { APPROVAL_LABEL, type ApprovalStatus } from "@/lib/approval";
 
 const MESSAGES: Record<Exclude<ApprovalStatus, "APROVADO">, { title: string; text: string }> = {
   PENDENTE: {
-    title: "Aguardando aprovação do gestor",
-    text: "Recebemos o seu cadastro. Agora ele aguarda a aprovação do gestor da BMC Academy antes de você entrar nos treinamentos. Assim que for aprovado, você receberá um e-mail.",
+    title: "Aguardando aprovação",
+    text: "Recebemos o seu cadastro. Agora ele aguarda a aprovação da equipe da BMC Academy antes de você entrar nos treinamentos. Assim que for aprovado, você receberá um e-mail.",
   },
   AGUARDANDO_HOMOLOGACAO: {
     title: "Aprovado, aguardando homologação",
