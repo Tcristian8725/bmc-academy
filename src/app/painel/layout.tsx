@@ -14,6 +14,7 @@ export default async function PainelLayout({ children }: { children: React.React
         links={[
           { href: "/painel", label: "Meus treinamentos" },
           { href: "/painel/trilhas", label: "Trilhas de conhecimento" },
+          { href: "/painel/diagnostico", label: "Diagnóstico" },
           { href: "/painel/certificados", label: "Meus certificados" },
         ]}
         profileHref="/painel/perfil"
