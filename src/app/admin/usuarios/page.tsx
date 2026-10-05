@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { isNotNull, isNull } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { formatDateTimeBR } from "@/lib/datetime";
 import UserForm from "./user-form";
 import DeleteUserButton from "./delete-user-button";
 import {
   deleteUserAction,
+  restoreUserAction,
   toggleUserActiveAction,
   updateApprovalStatusAction,
   updateUserRoleAction,
@@ -21,7 +23,6 @@ import {
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Administrador",
-  GESTOR: "Gestor",
   TECNICO: "Técnico",
   RC: "RC",
   FUNCIONARIO: "Funcionário BMC",
@@ -31,7 +32,6 @@ const ROLE_OPTIONS = [
   ["TECNICO", "Técnico"],
   ["RC", "RC / Representante Comercial"],
   ["FUNCIONARIO", "Funcionário BMC"],
-  ["GESTOR", "Gestor"],
   ["ADMIN", "Administrador"],
 ] as const;
 
@@ -41,25 +41,27 @@ const ROLE_TABS = [
   ["TECNICO", "Técnicos"],
   ["RC", "RCs"],
   ["FUNCIONARIO", "Funcionários BMC"],
-  ["GESTOR", "Gestores"],
   ["ADMIN", "Administradores"],
 ] as const;
 
 export default async function UsuariosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; status?: string }>;
+  searchParams: Promise<{ role?: string; status?: string; excluidos?: string }>;
 }) {
   const session = await requireUser(["ADMIN"]);
-  const { role: roleFilter, status: statusParam } = await searchParams;
+  const { role: roleFilter, status: statusParam, excluidos } = await searchParams;
+  const showDeleted = excluidos === "1";
 
-  const allUsers = await db.select().from(users);
-  const managers = allUsers.filter((u) => u.role === "GESTOR" || u.role === "ADMIN");
+  // Exclusão é reversível (rodada 42): excluídos ficam ocultos de tudo e só
+  // aparecem na aba "Excluídos", de onde podem ser restaurados.
+  const allUsers = await db.select().from(users).where(isNull(users.deletedAt));
+  const deletedUsers = await db.select().from(users).where(isNotNull(users.deletedAt));
 
   const validFilter = roleFilter && roleLabel[roleFilter] ? roleFilter : undefined;
   const statusFilter =
     statusParam && isApprovalStatus(statusParam) ? (statusParam as ApprovalStatus) : undefined;
-  const visibleUsers = allUsers
+  const visibleUsers = (showDeleted ? deletedUsers : allUsers)
     .filter((u) => !validFilter || u.role === validFilter)
     .filter((u) => !statusFilter || u.approvalStatus === statusFilter);
 
@@ -145,7 +147,25 @@ export default async function UsuariosPage({
         ))}
       </div>
 
-      <UserForm managers={managers.map((m) => ({ id: m.id, name: m.name }))} />
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/usuarios?excluidos=1"
+          className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            showDeleted
+              ? "bg-red-600 text-white"
+              : "bg-white text-gray-600 ring-1 ring-black/5 hover:bg-gray-50"
+          }`}
+        >
+          Excluídos ({deletedUsers.length})
+        </Link>
+        {showDeleted && (
+          <span className="self-center text-xs text-gray-500">
+            Histórico guardado. Restaure para a pessoa continuar de onde parou.
+          </span>
+        )}
+      </div>
+
+      {!showDeleted && <UserForm />}
 
       <div className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-black/5">
         <table className="w-full text-left text-sm">
@@ -164,7 +184,7 @@ export default async function UsuariosPage({
             {visibleUsers.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
-                  Nenhum usuário encontrado{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}.
+                  {showDeleted ? "Nenhum usuário excluído" : "Nenhum usuário encontrado"}{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}.
                 </td>
               </tr>
             )}
@@ -173,7 +193,7 @@ export default async function UsuariosPage({
                 <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
                 <td className="px-4 py-3 text-gray-600">
-                  {u.id === session.userId ? (
+                  {u.id === session.userId || u.deletedAt ? (
                     roleLabel[u.role] ?? u.role
                   ) : (
                     <form
@@ -208,7 +228,7 @@ export default async function UsuariosPage({
                   >
                     {APPROVAL_LABEL[u.approvalStatus as ApprovalStatus] ?? u.approvalStatus}
                   </span>
-                  {u.id !== session.userId && (
+                  {u.id !== session.userId && !u.deletedAt && (
                     <form
                       action={updateApprovalStatusAction.bind(null, u.id)}
                       className="flex items-center gap-2"
@@ -236,10 +256,14 @@ export default async function UsuariosPage({
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      u.active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                      u.deletedAt
+                        ? "bg-red-100 text-red-700"
+                        : u.active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {u.active ? "Ativo" : "Inativo"}
+                    {u.deletedAt ? "Excluído" : u.active ? "Ativo" : "Inativo"}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500">
@@ -253,16 +277,32 @@ export default async function UsuariosPage({
                     >
                       Ver perfil
                     </Link>
-                    <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
-                      <button
-                        type="submit"
-                        className="text-xs font-medium text-brand hover:underline"
-                      >
-                        {u.active ? "Desativar" : "Reativar"}
-                      </button>
-                    </form>
-                    {u.id !== session.userId && (
-                      <DeleteUserButton action={deleteUserAction.bind(null, u.id)} name={u.name} />
+                    {u.deletedAt ? (
+                      <form action={restoreUserAction.bind(null, u.id)}>
+                        <button
+                          type="submit"
+                          className="text-xs font-medium text-emerald-700 hover:underline"
+                        >
+                          Restaurar
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
+                          <button
+                            type="submit"
+                            className="text-xs font-medium text-brand hover:underline"
+                          >
+                            {u.active ? "Desativar" : "Reativar"}
+                          </button>
+                        </form>
+                        {u.id !== session.userId && (
+                          <DeleteUserButton
+                            action={deleteUserAction.bind(null, u.id)}
+                            name={u.name}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </td>
