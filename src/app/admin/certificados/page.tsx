@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { certificates, users, trainings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -21,6 +21,7 @@ export default async function CertificadosPage() {
     .from(certificates)
     .innerJoin(users, eq(certificates.userId, users.id))
     .innerJoin(trainings, eq(certificates.trainingId, trainings.id))
+    .where(isNull(users.deletedAt))
     .orderBy(desc(certificates.issuedAt));
 
   return (
