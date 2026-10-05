@@ -49,7 +49,9 @@ Sua conta na BMC Academy foi criada. Use os dados abaixo para o primeiro acesso:
 E-mail: ${email}
 Senha provisória: ${tempPassword}
 
-No primeiro acesso, você vai precisar completar seu cadastro (nome, CPF, CNPJ quando aplicável, endereço e tipo de vínculo).
+No primeiro acesso, você vai precisar completar seu cadastro (nome, CPF, CNPJ quando aplicável, endereço com cidade e estado, e tipo de vínculo).
+
+Depois de completar o cadastro, ele fica em análise: o acesso aos treinamentos só é liberado quando um administrador da BMC Academy aprovar. Você receberá um e-mail quando isso acontecer.
 
 Acesse: ${process.env.APP_BASE_URL || ""}/login
 
@@ -76,6 +78,7 @@ Acesse: ${process.env.APP_BASE_URL || ""}/login
       passwordHash,
       role: "TECNICO", // provisório: o papel final é definido no cadastro (limitado por segurança — ver actions.ts de /cadastro)
       profileCompleted: false,
+      approvalStatus: "PENDENTE", // só entra no painel depois que um admin aprovar
     })
     .returning();
 
