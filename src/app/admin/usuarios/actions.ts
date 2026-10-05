@@ -1,12 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 import { requireUser, hashPassword } from "@/lib/auth";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import {
+  certificates,
+  examAttempts,
+  lessonProgress,
+  progress,
+  trainingAssignments,
+  userNotifications,
+  users,
+} from "@/db/schema";
 import { logAudit } from "@/lib/audit";
 import { assignPublishedTrainingsToUser } from "@/lib/assignments";
+import { isApprovalStatus, notifyUserApprovalChange } from "@/lib/approval";
+import { normalizeUf } from "@/lib/regions";
 
 export interface UserFormState {
   error?: string;
@@ -94,6 +105,39 @@ export async function toggleUserActiveAction(userId: string, active: boolean) {
   revalidatePath("/admin/usuarios");
 }
 
+/** Muda o status de aprovação do cadastro (Aprovado / Aguardando
+ * homologação / Técnico não homologado / Pendente). Só administradores.
+ * Ao aprovar, a pessoa já recebe os treinamentos publicados do perfil dela e
+ * é avisada por e-mail. Nunca remove atribuições existentes. */
+export async function updateApprovalStatusAction(userId: string, formData: FormData) {
+  const session = await requireUser(["ADMIN"]);
+
+  // Evita que o admin logado mude o próprio status por engano.
+  if (userId === session.userId) return;
+
+  const status = String(formData.get("approvalStatus") || "");
+  if (!isApprovalStatus(status)) return;
+
+  const [target] = await db.select().from(users).where(eq(users.id, userId));
+  if (!target || target.approvalStatus === status) return;
+
+  await db.update(users).set({ approvalStatus: status }).where(eq(users.id, userId));
+  await logAudit(session.userId!, "USER_APPROVAL_CHANGED", {
+    userId,
+    from: target.approvalStatus,
+    to: status,
+  });
+
+  if (status === "APROVADO") {
+    await assignPublishedTrainingsToUser(userId, target.role);
+  }
+  await notifyUserApprovalChange({ name: target.name, email: target.email }, status);
+
+  revalidatePath("/admin/usuarios");
+  revalidatePath("/admin/aprovacoes");
+  revalidatePath(`/admin/usuarios/${userId}`);
+}
+
 export interface UpdateProfileState {
   error?: string;
   success?: boolean;
@@ -118,14 +162,81 @@ export async function updateUserProfileAction(
   const position = String(formData.get("position") || "").trim() || null;
   const department = String(formData.get("department") || "").trim() || null;
   const address = String(formData.get("address") || "").trim() || null;
+  const cep = String(formData.get("cep") || "").trim() || null;
+  const city = String(formData.get("city") || "").trim() || null;
+  const rawState = String(formData.get("state") || "").trim();
+  const state = normalizeUf(rawState);
+  if (rawState && !state) {
+    return { error: "UF inválida. Use a sigla do estado (ex.: PA, SP)." };
+  }
 
   await db
     .update(users)
-    .set({ cpf, cnpj, registrationNumber, phone, whatsapp, position, department, address })
+    .set({
+      cpf,
+      cnpj,
+      registrationNumber,
+      phone,
+      whatsapp,
+      position,
+      department,
+      address,
+      cep,
+      city,
+      state,
+    })
     .where(eq(users.id, userId));
 
   await logAudit(session.userId!, "USER_PROFILE_UPDATED", { userId });
 
   revalidatePath(`/admin/usuarios/${userId}`);
   return { success: true };
+}
+
+/** Exclui um usuário de vez (rodada 41), junto com tudo que é dele: progresso,
+ * atribuições, tentativas de prova, certificados e notificações. Só
+ * administrador, exige a confirmação marcada, e nunca deixa excluir a própria
+ * conta nem o último administrador ativo. Para só bloquear o acesso sem apagar
+ * o histórico, existe "Desativar". */
+export async function deleteUserAction(userId: string, formData: FormData) {
+  const session = await requireUser(["ADMIN"]);
+
+  if (formData.get("confirm") !== "yes") return;
+  if (userId === session.userId) return;
+
+  const [target] = await db.select().from(users).where(eq(users.id, userId));
+  if (!target) return;
+
+  if (target.role === "ADMIN") {
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.role, "ADMIN"), eq(users.active, true)));
+    if (admins.filter((a) => a.id !== userId).length === 0) return;
+  }
+
+  // certificates.examAttemptId referencia exam_attempts — certificados primeiro.
+  await db.delete(certificates).where(eq(certificates.userId, userId));
+  await db.delete(examAttempts).where(eq(examAttempts.userId, userId));
+  await db.delete(lessonProgress).where(eq(lessonProgress.userId, userId));
+  await db.delete(progress).where(eq(progress.userId, userId));
+  await db.delete(trainingAssignments).where(eq(trainingAssignments.userId, userId));
+  await db
+    .update(trainingAssignments)
+    .set({ assignedBy: null })
+    .where(eq(trainingAssignments.assignedBy, userId));
+  await db.delete(userNotifications).where(eq(userNotifications.userId, userId));
+  await db.update(users).set({ managerId: null }).where(eq(users.managerId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+
+  await logAudit(session.userId!, "USER_DELETED", {
+    userId,
+    name: target.name,
+    email: target.email,
+    role: target.role,
+  });
+
+  revalidatePath("/admin/usuarios");
+  revalidatePath("/admin/aprovacoes");
+  redirect("/admin/usuarios");
 }
