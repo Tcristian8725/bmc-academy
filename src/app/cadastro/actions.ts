@@ -20,7 +20,7 @@ export interface CompleteProfileState {
 // Os três tipos (Técnico, RC, Funcionário BMC) viram papéis de verdade,
 // distintos entre si — usados pra decidir quais treinamentos cada um recebe
 // automaticamente (ver src/lib/assignments.ts). Nenhum dos três dá acesso
-// de Gestor/Administrador por conta própria — elevar pra Gestor/Admin continua
+// de Administrador por conta própria — elevar pra Admin continua
 // sendo feito manualmente em Admin > Usuários. Desde a rodada 40, todo
 // autocadastro também fica PENDENTE até um admin aprovar o acesso.
 const TIPO_TO_ROLE = {
