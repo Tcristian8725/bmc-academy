@@ -26,6 +26,7 @@ import {
   unassignUserAction,
 } from "./actions";
 import { parseAudienceRoles } from "@/lib/assignments";
+import { compareNames } from "@/lib/sort";
 import { TRAINING_CATEGORIES } from "@/lib/categories";
 import { AudienceForm } from "./audience-form";
 
@@ -97,6 +98,10 @@ export default async function TrainingDetailPage({
       !assignedIds.has(u.id) &&
       (u.role === "TECNICO" || u.role === "RC" || u.role === "FUNCIONARIO")
   );
+
+  // Pessoas em ordem alfabética (rodada 43).
+  assignments.sort((a, b) => compareNames(a.userName, b.userName));
+  availableUsers.sort((a, b) => compareNames(a.name, b.name));
 
   const currentAudience = parseAudienceRoles(training.audienceRoles);
 
