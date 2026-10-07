@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { isNotNull, isNull } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
+import { compareNames } from "@/lib/sort";
 import { formatDateTimeBR } from "@/lib/datetime";
 import UserForm from "./user-form";
 import DeleteUserButton from "./delete-user-button";
@@ -55,8 +56,13 @@ export default async function UsuariosPage({
 
   // Exclusão é reversível (rodada 42): excluídos ficam ocultos de tudo e só
   // aparecem na aba "Excluídos", de onde podem ser restaurados.
-  const allUsers = await db.select().from(users).where(isNull(users.deletedAt));
-  const deletedUsers = await db.select().from(users).where(isNotNull(users.deletedAt));
+  // Sempre em ordem alfabética pelo nome (rodada 43).
+  const allUsers = (await db.select().from(users).where(isNull(users.deletedAt))).sort((a, b) =>
+    compareNames(a.name, b.name)
+  );
+  const deletedUsers = (await db.select().from(users).where(isNotNull(users.deletedAt))).sort(
+    (a, b) => compareNames(a.name, b.name)
+  );
 
   const validFilter = roleFilter && roleLabel[roleFilter] ? roleFilter : undefined;
   const statusFilter =
