@@ -5,6 +5,7 @@ import { progress as progressTable, users, trainings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatDateTimeBR } from "@/lib/datetime";
 import { getDiagnosticTrainingIds } from "@/lib/diagnostic-ids";
+import { compareNames } from "@/lib/sort";
 
 const statusLabel: Record<string, string> = {
   NAO_INICIADO: "Não iniciado",
@@ -49,6 +50,12 @@ export default async function ProgressoPage({
         ? and(isNull(users.deletedAt), notInArray(progressTable.trainingId, diagnosticIds))
         : isNull(users.deletedAt)
     );
+
+  // Por pessoa em ordem alfabética, depois por treinamento (rodada 43).
+  rows.sort(
+    (a, b) =>
+      compareNames(a.userName, b.userName) || compareNames(a.trainingTitle, b.trainingTitle)
+  );
 
   const countByStatus = (status: string) => rows.filter((r) => r.status === status).length;
   const visibleRows = validFilter ? rows.filter((r) => r.status === validFilter) : rows;
