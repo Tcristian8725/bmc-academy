@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { assignPublishedTrainingsToUser } from "@/lib/assignments";
 import { notifyAdminsPendingSignup } from "@/lib/approval";
 import { normalizeUf } from "@/lib/regions";
-import { isValidCnpj, isValidCpf, onlyDigits } from "@/lib/documents";
+import { formatPhone, isValidCnpj, isValidCpf, isValidPhone, onlyDigits } from "@/lib/documents";
 
 export interface CompleteProfileState {
   error?: string;
@@ -44,6 +44,7 @@ export async function completeProfileAction(
   const name = String(formData.get("name") || "").trim();
   const cpf = String(formData.get("cpf") || "").trim();
   const cnpj = String(formData.get("cnpj") || "").trim();
+  const phoneRaw = String(formData.get("phone") || "").trim();
   const cepDigits = onlyDigits(String(formData.get("cep") || ""));
   const street = String(formData.get("street") || "").trim();
   const number = String(formData.get("number") || "").trim();
@@ -61,6 +62,11 @@ export async function completeProfileAction(
   }
   if (cnpj && !isValidCnpj(cnpj)) {
     return { error: "CNPJ inválido. Confira os 14 números ou deixe em branco." };
+  }
+  // Contato telefônico obrigatório (rodada 43): a equipe liga se precisar
+  // confirmar o cadastro antes de aprovar.
+  if (!isValidPhone(phoneRaw)) {
+    return { error: "Informe um telefone com DDD, por exemplo (91) 99999-9999." };
   }
   if (cepDigits.length !== 8) {
     return { error: "Informe o CEP com 8 números." };
@@ -95,6 +101,7 @@ export async function completeProfileAction(
       name,
       cpf,
       cnpj: cnpj || null,
+      phone: formatPhone(phoneRaw),
       address,
       cep,
       city,
