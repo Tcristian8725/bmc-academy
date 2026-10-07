@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { formatDateTimeBR } from "@/lib/datetime";
 import { regionOfUf } from "@/lib/regions";
+import { compareNames } from "@/lib/sort";
 import { updateApprovalStatusAction, deleteUserAction } from "../usuarios/actions";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -29,6 +30,8 @@ export default async function AprovacoesPage() {
       )
     )
     .orderBy(asc(users.createdAt));
+  // Ordem alfabética (rodada 43), para facilitar a gestão.
+  waiting.sort((a, b) => compareNames(a.name, b.name));
 
   const notFinished = await db
     .select({ id: users.id })
@@ -77,6 +80,7 @@ export default async function AprovacoesPage() {
             </div>
 
             <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <Item label="Telefone / WhatsApp" value={u.phone} />
               <Item label="CPF" value={u.cpf} />
               <Item label="CNPJ (terceiro)" value={u.cnpj || "— (não é terceiro)"} />
               <Item label="Cadastro enviado em" value={u.createdAt ? formatDateTimeBR(u.createdAt) : null} />
