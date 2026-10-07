@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeProfileAction, type CompleteProfileState } from "./actions";
 import { UFS } from "@/lib/regions";
-import { formatCep, formatCnpj, formatCpf, onlyDigits } from "@/lib/documents";
+import { formatCep, formatCnpj, formatCpf, formatPhone, onlyDigits } from "@/lib/documents";
 
 const initialState: CompleteProfileState = {};
 
@@ -27,6 +27,11 @@ export default function CadastroForm() {
 
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
+  const [phone, setPhone] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [tipo, setTipo] = useState("");
   const [cep, setCep] = useState("");
   const [street, setStreet] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -107,7 +112,14 @@ export default function CadastroForm() {
     <form action={formAction} className="space-y-4">
       <div>
         <label className={labelClass}>Nome completo</label>
-        <input name="name" required autoComplete="name" className={inputClass} />
+        <input
+          name="name"
+          required
+          autoComplete="name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          className={inputClass}
+        />
       </div>
 
       <div>
@@ -136,6 +148,24 @@ export default function CadastroForm() {
         <p className="mt-1 text-xs text-gray-400">
           Pode ser o mesmo CNPJ de outra pessoa — várias pessoas da mesma empresa podem usar o
           mesmo CNPJ.
+        </p>
+      </div>
+
+      <div>
+        <label className={labelClass}>Telefone / WhatsApp para contato</label>
+        <input
+          name="phone"
+          required
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="(00) 00000-0000"
+          value={phone}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          className={inputClass}
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Com DDD. Obrigatório: a equipe da BMC Academy pode ligar se precisar confirmar o seu cadastro.
         </p>
       </div>
 
@@ -184,13 +214,21 @@ export default function CadastroForm() {
                   name="number"
                   required
                   ref={numberRef}
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
                   placeholder="Ex.: 120"
                   className={inputClass}
                 />
               </div>
               <div className="col-span-2">
                 <label className={labelClass}>Complemento (opcional)</label>
-                <input name="complement" placeholder="Apto, bloco, sala…" className={inputClass} />
+                <input
+                  name="complement"
+                  placeholder="Apto, bloco, sala…"
+                  value={complement}
+                  onChange={(e) => setComplement(e.target.value)}
+                  className={inputClass}
+                />
               </div>
             </div>
 
@@ -253,7 +291,15 @@ export default function CadastroForm() {
         <div className="space-y-2">
           {TIPOS.map(([v, l]) => (
             <label key={v} className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="radio" name="tipo" value={v} required className="accent-[--color-brand]" />
+              <input
+                type="radio"
+                name="tipo"
+                value={v}
+                required
+                checked={tipo === v}
+                onChange={() => setTipo(v)}
+                className="accent-[--color-brand]"
+              />
               {l}
             </label>
           ))}
