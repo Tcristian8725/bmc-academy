@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/audit";
 import { assignPublishedTrainingsToUser } from "@/lib/assignments";
 import { isApprovalStatus, notifyUserApprovalChange } from "@/lib/approval";
 import { normalizeUf } from "@/lib/regions";
+import { formatPhone, isValidCnpj, isValidCpf, isValidPhone } from "@/lib/documents";
 
 export interface UserFormState {
   error?: string;
@@ -154,6 +155,17 @@ export async function updateUserProfileAction(
 ): Promise<UpdateProfileState> {
   const session = await requireUser(["ADMIN"]);
 
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  if (!name) return { error: "O nome completo não pode ficar vazio." };
+  if (!email || /\s/.test(email)) {
+    return { error: "Informe o login (e-mail) do usuário." };
+  }
+  const [sameEmail] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  if (sameEmail && sameEmail.id !== userId) {
+    return { error: "Já existe outro usuário com este e-mail/login." };
+  }
+
   const cpf = String(formData.get("cpf") || "").trim() || null;
   const cnpj = String(formData.get("cnpj") || "").trim() || null;
   const registrationNumber = String(formData.get("registrationNumber") || "").trim() || null;
@@ -169,14 +181,21 @@ export async function updateUserProfileAction(
   if (rawState && !state) {
     return { error: "UF inválida. Use a sigla do estado (ex.: PA, SP)." };
   }
+  if (cpf && !isValidCpf(cpf)) return { error: "CPF inválido. Confira os 11 números." };
+  if (cnpj && !isValidCnpj(cnpj)) return { error: "CNPJ inválido. Confira os 14 números." };
+  if (phone && !isValidPhone(phone)) {
+    return { error: "Telefone inválido. Use DDD + número, por exemplo (91) 99999-9999." };
+  }
 
   await db
     .update(users)
     .set({
+      name,
+      email,
       cpf,
       cnpj,
       registrationNumber,
-      phone,
+      phone: phone ? formatPhone(phone) : null,
       whatsapp,
       position,
       department,
@@ -188,6 +207,42 @@ export async function updateUserProfileAction(
     .where(eq(users.id, userId));
 
   await logAudit(session.userId!, "USER_PROFILE_UPDATED", { userId });
+
+  revalidatePath(`/admin/usuarios/${userId}`);
+  revalidatePath("/admin/usuarios");
+  return { success: true };
+}
+
+export interface ResetPasswordState {
+  error?: string;
+  success?: boolean;
+}
+
+/** Admin define uma nova senha para um usuário (ex.: técnico que esqueceu a
+ * senha). A senha anterior deixa de valer na hora; o admin informa a nova
+ * senha à pessoa. Fica registrado na auditoria (sem a senha). */
+export async function resetUserPasswordAction(
+  userId: string,
+  _prev: ResetPasswordState,
+  formData: FormData
+): Promise<ResetPasswordState> {
+  const session = await requireUser(["ADMIN"]);
+
+  const newPassword = String(formData.get("newPassword") || "");
+  const confirmPassword = String(formData.get("confirmPassword") || "");
+  if (newPassword.length < 6) {
+    return { error: "A nova senha precisa ter pelo menos 6 caracteres." };
+  }
+  if (newPassword !== confirmPassword) {
+    return { error: "A confirmação não é igual à nova senha." };
+  }
+
+  const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId));
+  if (!target) return { error: "Usuário não encontrado." };
+
+  const passwordHash = await hashPassword(newPassword);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await logAudit(session.userId!, "USER_PASSWORD_RESET", { userId });
 
   revalidatePath(`/admin/usuarios/${userId}`);
   return { success: true };
