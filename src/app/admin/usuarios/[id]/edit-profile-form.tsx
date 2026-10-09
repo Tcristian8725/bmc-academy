@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, startTransition } from "react";
 import { updateUserProfileAction, type UpdateProfileState } from "../actions";
 
 const initialState: UpdateProfileState = {};
@@ -11,6 +11,8 @@ export default function EditProfileForm({
 }: {
   userId: string;
   initial: {
+    name: string;
+    email: string;
     cpf: string | null;
     cnpj: string | null;
     registrationNumber: string | null;
@@ -26,19 +28,32 @@ export default function EditProfileForm({
 }) {
   const action = updateUserProfileAction.bind(null, userId);
   const [state, formAction, pending] = useActionState(action, initialState);
+
+  // Envia sem o "reset" automático do formulário: se der erro de validação,
+  // a pessoa não perde o que já digitou.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    startTransition(() => formAction(data));
+  }
   const [open, setOpen] = useState(false);
 
   return (
     <div className="mt-4">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-sm font-semibold text-brand hover:underline"
+        className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-light"
       >
         {open ? "Fechar edição" : "Editar dados"}
       </button>
 
       {open && (
-        <form action={formAction} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <form
+      onSubmit={submit}
+      className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Nome completo" name="name" defaultValue={initial.name} />
+          <Field label="Login (e-mail)" name="email" defaultValue={initial.email} />
           <Field label="CPF" name="cpf" defaultValue={initial.cpf} />
           <Field label="CNPJ" name="cnpj" defaultValue={initial.cnpj} />
           <Field label="Matrícula" name="registrationNumber" defaultValue={initial.registrationNumber} />
