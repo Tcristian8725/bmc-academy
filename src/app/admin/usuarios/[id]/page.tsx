@@ -7,6 +7,7 @@ import { users, branches, certificates, trainings } from "@/db/schema";
 import { listAssignmentsForUser } from "@/lib/training-flow";
 import { formatDateBR, formatDateTimeBR } from "@/lib/datetime";
 import EditProfileForm from "./edit-profile-form";
+import ResetPasswordForm from "./reset-password-form";
 import { APPROVAL_LABEL, type ApprovalStatus } from "@/lib/approval";
 import { regionOfUf } from "@/lib/regions";
 import { deleteUserAction, restoreUserAction } from "../actions";
@@ -146,6 +147,8 @@ export default async function PerfilUsuarioPage({
         <EditProfileForm
           userId={user.id}
           initial={{
+            name: user.name,
+            email: user.email,
             cpf: user.cpf,
             cnpj: user.cnpj,
             registrationNumber: user.registrationNumber,
@@ -160,6 +163,18 @@ export default async function PerfilUsuarioPage({
           }}
         />
       </div>
+
+      {/* Senha */}
+      {!user.deletedAt && (
+        <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="text-lg font-semibold text-foreground">Senha de acesso</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Defina uma nova senha para este usuário (por exemplo, se o técnico esqueceu a senha).
+            A senha antiga deixa de valer na hora; depois é só passar a nova senha para ele.
+          </p>
+          <ResetPasswordForm userId={user.id} />
+        </div>
+      )}
 
       {/* Habilidades / treinamentos */}
       <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-black/5">
