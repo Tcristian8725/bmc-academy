@@ -54,14 +54,19 @@ export async function completeProfileAction(
   const state = normalizeUf(String(formData.get("state") || ""));
   const tipo = String(formData.get("tipo") || "") as keyof typeof TIPO_TO_ROLE;
 
-  if (!name) {
-    return { error: "Informe seu nome completo." };
+  // Nome completo obrigatório (rodada 44): nome e sobrenome.
+  if (name.split(/\s+/).filter((w) => w.length >= 2).length < 2) {
+    return { error: "Informe seu nome completo (nome e sobrenome)." };
   }
   if (!isValidCpf(cpf)) {
     return { error: "CPF inválido. Confira os 11 números." };
   }
-  if (cnpj && !isValidCnpj(cnpj)) {
-    return { error: "CNPJ inválido. Confira os 14 números ou deixe em branco." };
+  // CNPJ obrigatório (rodada 44).
+  if (!cnpj) {
+    return { error: "Informe o CNPJ da empresa." };
+  }
+  if (!isValidCnpj(cnpj)) {
+    return { error: "CNPJ inválido. Confira os 14 números." };
   }
   // Contato telefônico obrigatório (rodada 43): a equipe liga se precisar
   // confirmar o cadastro antes de aprovar.
@@ -100,7 +105,7 @@ export async function completeProfileAction(
     .set({
       name,
       cpf,
-      cnpj: cnpj || null,
+      cnpj,
       phone: formatPhone(phoneRaw),
       address,
       cep,
