@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeProfileAction, type CompleteProfileState } from "./actions";
 import { UFS } from "@/lib/regions";
@@ -23,6 +23,14 @@ type CepStatus = "idle" | "loading" | "found" | "notfound" | "error";
 
 export default function CadastroForm() {
   const [state, formAction, pending] = useActionState(completeProfileAction, initialState);
+
+  // Envia sem o "reset" automático do formulário: se der erro de validação,
+  // a pessoa não perde o que já digitou.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    startTransition(() => formAction(data));
+  }
   const router = useRouter();
 
   const [cpf, setCpf] = useState("");
@@ -109,13 +117,16 @@ export default function CadastroForm() {
   const showAddress = cepStatus === "found" || cepStatus === "notfound" || cepStatus === "error";
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form
+      onSubmit={submit}
+      className="space-y-4">
       <div>
-        <label className={labelClass}>Nome completo</label>
+        <label className={labelClass}>Nome completo *</label>
         <input
           name="name"
           required
           autoComplete="name"
+          placeholder="Nome e sobrenome"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           className={inputClass}
@@ -123,7 +134,7 @@ export default function CadastroForm() {
       </div>
 
       <div>
-        <label className={labelClass}>CPF</label>
+        <label className={labelClass}>CPF *</label>
         <input
           name="cpf"
           required
@@ -136,23 +147,24 @@ export default function CadastroForm() {
       </div>
 
       <div>
-        <label className={labelClass}>CNPJ (somente se for de uma empresa terceirizada)</label>
+        <label className={labelClass}>CNPJ da empresa *</label>
         <input
           name="cnpj"
+          required
           inputMode="numeric"
-          placeholder="00.000.000/0000-00 (opcional)"
+          placeholder="00.000.000/0000-00"
           value={cnpj}
           onChange={(e) => setCnpj(formatCnpj(e.target.value))}
           className={inputClass}
         />
         <p className="mt-1 text-xs text-gray-400">
-          Pode ser o mesmo CNPJ de outra pessoa — várias pessoas da mesma empresa podem usar o
-          mesmo CNPJ.
+          Obrigatório. Pode ser o mesmo CNPJ de outras pessoas — várias pessoas da mesma empresa
+          podem usar o mesmo CNPJ.
         </p>
       </div>
 
       <div>
-        <label className={labelClass}>Telefone / WhatsApp para contato</label>
+        <label className={labelClass}>Telefone / WhatsApp para contato *</label>
         <input
           name="phone"
           required
@@ -306,20 +318,24 @@ export default function CadastroForm() {
         </div>
       </div>
 
-      {state.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={pending || !showAddress}
-        className="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
-      >
-        {pending ? "Enviando..." : "Enviar cadastro para aprovação"}
-      </button>
-      <p className="text-center text-xs text-gray-400">
-        Depois de enviar, o seu acesso fica aguardando a aprovação da equipe da BMC Academy.
-      </p>
+      {/* Barra fixa no rodapé da tela: o botão de salvar fica sempre visível,
+          mesmo com o formulário longo (rodada 44). */}
+      <div className="sticky bottom-0 -mx-6 -mb-6 rounded-b-xl border-t border-gray-200 bg-white/95 px-6 py-3 backdrop-blur">
+        {state.error && (
+          <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>
+        )}
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+        >
+          {pending ? "Salvando..." : "Salvar e enviar para aprovação"}
+        </button>
+        <p className="mt-2 text-center text-xs text-gray-400">
+          Campos com * são obrigatórios. Depois de salvar, o seu acesso fica aguardando a
+          aprovação da equipe da BMC Academy.
+        </p>
+      </div>
     </form>
   );
 }
