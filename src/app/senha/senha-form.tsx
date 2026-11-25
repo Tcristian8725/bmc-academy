@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { changePasswordAction, type ChangePasswordState } from "./actions";
+import PasswordInput from "@/components/password-input";
 
 const initialState: ChangePasswordState = {};
 
@@ -15,19 +16,19 @@ export default function SenhaForm() {
     >
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Senha atual</label>
-        <input
-          type="password"
+        <PasswordInput
           name="currentPassword"
           required
+          autoComplete="current-password"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Nova senha</label>
-        <input
-          type="password"
+        <PasswordInput
           name="newPassword"
           required
+          autoComplete="new-password"
           minLength={6}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
@@ -35,10 +36,10 @@ export default function SenhaForm() {
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Confirmar nova senha</label>
-        <input
-          type="password"
+        <PasswordInput
           name="confirmPassword"
           required
+          autoComplete="new-password"
           minLength={6}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
