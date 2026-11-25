@@ -45,13 +45,57 @@ const ROLE_TABS = [
   ["ADMIN", "Administradores"],
 ] as const;
 
+/** Texto sem acento e em minúsculas, para a pesquisa não depender de maiúsculas/acentos. */
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Pesquisa (rodada 47): nome, e-mail/login, CPF, CNPJ, telefone, WhatsApp, matrícula,
+ * cargo, cidade e UF. Cada palavra digitada precisa aparecer em algum desses campos;
+ * números são comparados ignorando pontos, traços e parênteses. */
+function matchesQuery(
+  u: {
+    name: string;
+    email: string;
+    cpf: string | null;
+    cnpj: string | null;
+    phone: string | null;
+    whatsapp: string | null;
+    registrationNumber: string | null;
+    position: string | null;
+    city: string | null;
+    state: string | null;
+  },
+  query: string
+): boolean {
+  if (!query) return true;
+  const text = normalizeText(
+    [u.name, u.email, u.cpf, u.cnpj, u.phone, u.whatsapp, u.registrationNumber, u.position, u.city, u.state].join(" ")
+  );
+  const digits = [u.cpf, u.cnpj, u.phone, u.whatsapp, u.registrationNumber]
+    .map((v) => (v ?? "").replace(/\D/g, ""))
+    .join(" ");
+  return normalizeText(query)
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((term) => {
+      if (text.includes(term)) return true;
+      const onlyNums = term.replace(/\D/g, "");
+      return onlyNums.length >= 3 && digits.includes(onlyNums);
+    });
+}
+
 export default async function UsuariosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; status?: string; excluidos?: string }>;
+  searchParams: Promise<{ role?: string; status?: string; excluidos?: string; q?: string }>;
 }) {
   const session = await requireUser(["ADMIN"]);
-  const { role: roleFilter, status: statusParam, excluidos } = await searchParams;
+  const { role: roleFilter, status: statusParam, excluidos, q: qParam } = await searchParams;
+  const q = (qParam ?? "").trim().slice(0, 80);
   const showDeleted = excluidos === "1";
 
   // Exclusão é reversível (rodada 42): excluídos ficam ocultos de tudo e só
@@ -69,7 +113,17 @@ export default async function UsuariosPage({
     statusParam && isApprovalStatus(statusParam) ? (statusParam as ApprovalStatus) : undefined;
   const visibleUsers = (showDeleted ? deletedUsers : allUsers)
     .filter((u) => !validFilter || u.role === validFilter)
-    .filter((u) => !statusFilter || u.approvalStatus === statusFilter);
+    .filter((u) => !statusFilter || u.approvalStatus === statusFilter)
+    .filter((u) => matchesQuery(u, q));
+
+  // Links das abas mantêm a busca digitada (rodada 47).
+  const href = (params: Record<string, string | undefined> = {}) => {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
+    if (q) sp.set("q", q);
+    const qs = sp.toString();
+    return `/admin/usuarios${qs ? `?${qs}` : ""}`;
+  };
 
   const countByRole = (role: string) => allUsers.filter((u) => u.role === role).length;
   const countByStatus = (status: string) =>
@@ -84,15 +138,52 @@ export default async function UsuariosPage({
           {validFilter && <span className="text-gray-400"> — {roleLabel[validFilter]}</span>}
         </h1>
         <p className="text-sm text-gray-500">
-          {validFilter
-            ? `${visibleUsers.length} ${visibleUsers.length === 1 ? "pessoa" : "pessoas"} com perfil ${roleLabel[validFilter]}.`
-            : "Cadastro, edição e desativação de usuários (seção 2 do Prompt Mestre)."}
+          {q
+            ? `${visibleUsers.length} ${visibleUsers.length === 1 ? "resultado" : "resultados"} para “${q}”.`
+            : validFilter
+              ? `${visibleUsers.length} ${visibleUsers.length === 1 ? "pessoa" : "pessoas"} com perfil ${roleLabel[validFilter]}.`
+              : "Cadastro, edição e desativação de usuários (seção 2 do Prompt Mestre)."}
         </p>
       </div>
 
+      <form action="/admin/usuarios" method="get" className="flex flex-wrap items-center gap-2">
+        {validFilter && <input type="hidden" name="role" value={validFilter} />}
+        {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+        {showDeleted && <input type="hidden" name="excluidos" value="1" />}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Pesquisar por nome, e-mail, CPF, CNPJ, telefone ou cidade…"
+          className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 sm:max-w-md"
+        />
+        <button
+          type="submit"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          Pesquisar
+        </button>
+        {q && (
+          <Link
+            href={`/admin/usuarios${
+              validFilter || statusFilter || showDeleted
+                ? `?${new URLSearchParams({
+                    ...(validFilter ? { role: validFilter } : {}),
+                    ...(statusFilter ? { status: statusFilter } : {}),
+                    ...(showDeleted ? { excluidos: "1" } : {}),
+                  }).toString()}`
+                : ""
+            }`}
+            className="text-sm font-medium text-gray-500 hover:underline"
+          >
+            Limpar pesquisa
+          </Link>
+        )}
+      </form>
+
       {pendingCount > 0 && (
         <Link
-          href="/admin/usuarios?status=PENDENTE"
+          href={href({ status: "PENDENTE" })}
           className="block rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100"
         >
           {pendingCount} {pendingCount === 1 ? "cadastro aguardando" : "cadastros aguardando"}{" "}
@@ -103,7 +194,7 @@ export default async function UsuariosPage({
       <div className="flex flex-wrap gap-2">
         <span className="self-center text-xs font-medium text-gray-400">Situação:</span>
         <Link
-          href="/admin/usuarios"
+          href={href()}
           className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
             !statusFilter
               ? "bg-brand text-white"
@@ -115,7 +206,7 @@ export default async function UsuariosPage({
         {APPROVAL_STATUSES.map((s) => (
           <Link
             key={s}
-            href={`/admin/usuarios?status=${s}`}
+            href={href({ status: s })}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               statusFilter === s
                 ? "bg-brand text-white"
@@ -129,7 +220,7 @@ export default async function UsuariosPage({
 
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/usuarios"
+          href={href()}
           className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
             !validFilter
               ? "bg-brand text-white"
@@ -141,7 +232,7 @@ export default async function UsuariosPage({
         {ROLE_TABS.map(([value, label]) => (
           <Link
             key={value}
-            href={`/admin/usuarios?role=${value}`}
+            href={href({ role: value })}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               validFilter === value
                 ? "bg-brand text-white"
@@ -155,7 +246,7 @@ export default async function UsuariosPage({
 
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/admin/usuarios?excluidos=1"
+          href={href({ excluidos: "1" })}
           className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
             showDeleted
               ? "bg-red-600 text-white"
@@ -190,7 +281,7 @@ export default async function UsuariosPage({
             {visibleUsers.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
-                  {showDeleted ? "Nenhum usuário excluído" : "Nenhum usuário encontrado"}{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}.
+                  {showDeleted ? "Nenhum usuário excluído" : "Nenhum usuário encontrado"}{validFilter ? ` com perfil ${roleLabel[validFilter]}` : ""}{q ? ` para “${q}”` : ""}.
                 </td>
               </tr>
             )}
